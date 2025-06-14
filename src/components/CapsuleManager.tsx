@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { Clock, Lock, Unlock, Eye, MessageSquare, Zap, Target, Image, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Lock, Unlock, Eye, MessageSquare, Zap, Target, Image, X, Sparkles } from 'lucide-react';
 import {
   useGetOwnedCapsules,
   useGetCapsule,
@@ -348,8 +348,6 @@ const CapsuleManager: React.FC = () => {
   const [selectedCapsules, setSelectedCapsules] = useState<bigint[]>([]);
   const [viewingCapsule, setViewingCapsule] = useState<Capsule | null>(null);
   const [showContentModal, setShowContentModal] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [itemsPerPage] = useState(6); // Show 6 capsules per page
 
   // Contract hooks
   const { data: ownedCapsuleIds, isLoading: isLoadingCapsules } = useGetOwnedCapsules(address || '');
@@ -360,90 +358,16 @@ const CapsuleManager: React.FC = () => {
   const { isLoading: isUnlockLoading, isSuccess: isUnlockSuccess } = useTransactionReceipt(unlockHash);
   const { isLoading: isGiftLoading, isSuccess: isGiftSuccess } = useTransactionReceipt(giftHash);
 
-  // Get capsule data for up to 20 capsules
-  const capsuleIds = Array.isArray(ownedCapsuleIds) ? ownedCapsuleIds.slice(0, 20) : [];
-  
-  // Call hooks for each capsule at the top level (fixed number of hooks)
-  const capsule0 = useGetCapsule(capsuleIds[0] || BigInt(0));
-  const capsule1 = useGetCapsule(capsuleIds[1] || BigInt(0));
-  const capsule2 = useGetCapsule(capsuleIds[2] || BigInt(0));
-  const capsule3 = useGetCapsule(capsuleIds[3] || BigInt(0));
-  const capsule4 = useGetCapsule(capsuleIds[4] || BigInt(0));
-  const capsule5 = useGetCapsule(capsuleIds[5] || BigInt(0));
-  const capsule6 = useGetCapsule(capsuleIds[6] || BigInt(0));
-  const capsule7 = useGetCapsule(capsuleIds[7] || BigInt(0));
-  const capsule8 = useGetCapsule(capsuleIds[8] || BigInt(0));
-  const capsule9 = useGetCapsule(capsuleIds[9] || BigInt(0));
-  const capsule10 = useGetCapsule(capsuleIds[10] || BigInt(0));
-  const capsule11 = useGetCapsule(capsuleIds[11] || BigInt(0));
-  const capsule12 = useGetCapsule(capsuleIds[12] || BigInt(0));
-  const capsule13 = useGetCapsule(capsuleIds[13] || BigInt(0));
-  const capsule14 = useGetCapsule(capsuleIds[14] || BigInt(0));
-  const capsule15 = useGetCapsule(capsuleIds[15] || BigInt(0));
-  const capsule16 = useGetCapsule(capsuleIds[16] || BigInt(0));
-  const capsule17 = useGetCapsule(capsuleIds[17] || BigInt(0));
-  const capsule18 = useGetCapsule(capsuleIds[18] || BigInt(0));
-  const capsule19 = useGetCapsule(capsuleIds[19] || BigInt(0));
+  // Get capsule data for first few capsules (for demo)
+  const capsuleIds = Array.isArray(ownedCapsuleIds) ? ownedCapsuleIds : [];
+  const { data: capsule1Data } = useGetCapsule(capsuleIds[0] || BigInt(0));
+  const { data: capsule2Data } = useGetCapsule(capsuleIds[1] || BigInt(0));
+  const { data: capsule3Data } = useGetCapsule(capsuleIds[2] || BigInt(0));
 
-  // Collect all capsule data
-  const allCapsuleData = [
-    { id: capsuleIds[0], data: capsule0.data },
-    { id: capsuleIds[1], data: capsule1.data },
-    { id: capsuleIds[2], data: capsule2.data },
-    { id: capsuleIds[3], data: capsule3.data },
-    { id: capsuleIds[4], data: capsule4.data },
-    { id: capsuleIds[5], data: capsule5.data },
-    { id: capsuleIds[6], data: capsule6.data },
-    { id: capsuleIds[7], data: capsule7.data },
-    { id: capsuleIds[8], data: capsule8.data },
-    { id: capsuleIds[9], data: capsule9.data },
-    { id: capsuleIds[10], data: capsule10.data },
-    { id: capsuleIds[11], data: capsule11.data },
-    { id: capsuleIds[12], data: capsule12.data },
-    { id: capsuleIds[13], data: capsule13.data },
-    { id: capsuleIds[14], data: capsule14.data },
-    { id: capsuleIds[15], data: capsule15.data },
-    { id: capsuleIds[16], data: capsule16.data },
-    { id: capsuleIds[17], data: capsule17.data },
-    { id: capsuleIds[18], data: capsule18.data },
-    { id: capsuleIds[19], data: capsule19.data },
-  ].filter(item => item.id && item.data);
-
-  const capsules = allCapsuleData
-    .map(({ data }) => formatCapsuleData(data))
-    .filter((capsule): capsule is Capsule => capsule !== null)
-    .sort((a, b) => {
-      // Sort by unlock time (most recent first)
-      return Number(b.unlockTime) - Number(a.unlockTime);
-    });
-
-  // Pagination logic
-  const totalPages = Math.ceil(capsules.length / itemsPerPage);
-  const startIndex = currentPage * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentCapsules = capsules.slice(startIndex, endIndex);
-
-  const nextPage = () => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1));
-  };
-
-  const prevPage = () => {
-    setCurrentPage((prev) => Math.max(prev - 1, 0));
-  };
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' && currentPage > 0) {
-        prevPage();
-      } else if (e.key === 'ArrowRight' && currentPage < totalPages - 1) {
-        nextPage();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentPage, totalPages]);
+  const capsules = [capsule1Data, capsule2Data, capsule3Data]
+    .filter(Boolean)
+    .map(formatCapsuleData)
+    .filter((capsule): capsule is Capsule => capsule !== null);
 
   const handleUnlock = (capsuleId: bigint) => {
     unlockCapsule(capsuleId);
@@ -458,6 +382,15 @@ const CapsuleManager: React.FC = () => {
     setShowContentModal(true);
   };
 
+  // Animation variants for gradient overlay
+  const gradientVariants = {
+    initial: { opacity: 0, scale: 0.8 },
+    animate: { 
+      opacity: 0.1, 
+      scale: 1,
+      transition: { duration: 1.2, ease: "easeOut" }
+    }
+  }
   const parseEncryptedURI = (encryptedURI: string) => {
     try {
       if (encryptedURI.startsWith('data:application/json;base64,')) {
@@ -503,6 +436,17 @@ const CapsuleManager: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black pt-12 text-white">
+
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-600 rounded-full filter blur-[128px]"/>
+              <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600 rounded-full filter blur-[128px]"/>
+              <motion.div 
+                //@ts-ignore
+                variants={gradientVariants}
+                initial="initial"
+                animate="animate"
+              />
+            </div>
       <div className="container mx-auto px-6 py-12">
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-500 bg-clip-text text-transparent mb-4">
@@ -515,20 +459,24 @@ const CapsuleManager: React.FC = () => {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+          <div className="bg-gradient-to-br from-stone-950/20 via-stone-950 to-stone-950/20 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-6">
+          <div className=" absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500"/>
             <h3 className="text-lg font-semibold text-cyan-400 mb-2">Total Capsules</h3>
             <p className="text-3xl font-bold text-white">
               {Array.isArray(ownedCapsuleIds) ? ownedCapsuleIds.length : 0}
             </p>
           </div>
-          <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-green-400 mb-2">Unlocked</h3>
+          
+          <div className="bg-gradient-to-br from-stone-950/20 via-stone-950 to-stone-950/20 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-6">
+          <div className=" absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500"/>  <h3 className="text-lg font-semibold text-green-500 mb-2">Unlocked</h3>
             <p className="text-3xl font-bold text-white">
               {capsules.filter(c => c.isOpened).length}
             </p>
           </div>
-          <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-red-400 mb-2">Locked</h3>
+          
+          <div className="bg-gradient-to-br from-stone-950/20 via-stone-950 to-stone-950/20 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-6">
+          <div className=" absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500"/>
+            <h3 className="text-lg font-semibold text-red-500 mb-2">Locked</h3>
             <p className="text-3xl font-bold text-white">
               {capsules.filter(c => !c.isOpened).length}
             </p>
@@ -579,91 +527,35 @@ const CapsuleManager: React.FC = () => {
           </div>
         )}
 
-        {/* Results Summary */}
-        {capsules.length > 0 && (
-          <div className="text-center mb-6">
-            <p className="text-gray-400">
-              Showing {startIndex + 1}-{Math.min(endIndex, capsules.length)} of {capsules.length} capsules
-              {totalPages > 1 && ` • Page ${currentPage + 1} of ${totalPages}`}
-            </p>
-          </div>
-        )}
-
         {/* Capsules Grid */}
         {capsules.length > 0 ? (
-          <div className="relative">
-            {/* Carousel Navigation */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={prevPage}
-                  disabled={currentPage === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  Previous
-                </button>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400 text-sm">
-                    Page {currentPage + 1} of {totalPages}
-                  </span>
-                  <div className="flex gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setCurrentPage(i)}
-                        className={`w-2 h-2 rounded-full transition-colors ${
-                          i === currentPage ? 'bg-cyan-400' : 'bg-gray-600'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </div>
-                
-                <button
-                  onClick={nextPage}
-                  disabled={currentPage === totalPages - 1}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            <motion.div 
-              key={currentPage}
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.3 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              {currentCapsules.map((capsule, index) => (
-                <CapsuleDisplay
-                  key={capsule.id.toString()}
-                  capsule={capsule}
-                  onUnlock={handleUnlock}
-                  onGift={handleGift}
-                  onViewContent={handleViewContent}
-                  isUnlocking={isUnlocking || isUnlockLoading}
-                />
-              ))}
-            </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {capsules.map((capsule, index) => (
+              <CapsuleDisplay
+                key={capsule.id.toString()}
+                capsule={capsule}
+                onUnlock={handleUnlock}
+                onGift={handleGift}
+                onViewContent={handleViewContent}
+                isUnlocking={isUnlocking || isUnlockLoading}
+              />
+            ))}
           </div>
         ) : !isLoadingCapsules ? (
           <div className="text-center py-12">
-            <div className="w-24 h-24 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Clock className="w-12 h-12 text-gray-600" />
+            <div className="w-24 h-24 bg-stone-800 border-0.5 border-cyan-400 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Clock className="w-12 h-12 text-stone-600" />
             </div>
             <h3 className="text-xl font-semibold text-gray-400 mb-4">No Capsules Found</h3>
             <p className="text-gray-500 mb-8">You haven't created any time capsules yet.</p>
             <button
               onClick={() => window.location.href = '/create'}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-lg transition-colors"
+              className="bg-cyan-600 hover:bg-cyan-700  text-white px-6 py-3 rounded-lg transition-colors"
             >
+              <div className='flex items-center gap-2'>
+              <Sparkles className="w-5 h-5" />
               Create Your First Capsule
+              </div>
             </button>
           </div>
         ) : null}
