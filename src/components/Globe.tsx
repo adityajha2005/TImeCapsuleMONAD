@@ -8,23 +8,44 @@ const GlobeComponent: React.FC = () => {
   const planetAbsImgRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const animate = () => {
-      if (innerOrbitRef.current && outerOrbitRef.current && planetImgRef.current && planetAbsImgRef.current) {
-        let angle = 0;
-        const animateFrame = () => {
-          angle += 0.2; // Base speed for animations
-          
-          innerOrbitRef.current!.style.transform = `translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(${angle}deg) skew(0deg)`;
-          outerOrbitRef.current!.style.transform = `translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(${angle * 0.5}deg) skew(0deg)`; // Outline-Orbit at half speed
-          planetImgRef.current!.style.transform = `translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(${angle * 0.25}deg) skew(0deg)`; // Earth at quarter speed
-          planetAbsImgRef.current!.style.transform = `translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(${angle * 0.25}deg) skew(0deg)`; // Earth shadow matches Earth
-          
-          requestAnimationFrame(animateFrame);
-        };
-        requestAnimationFrame(animateFrame);
+    let angle = 0;
+    let animationId: number | null = null;
+    
+    const animateFrame = () => {
+      // Check if all refs are still valid before accessing them
+      if (
+        innerOrbitRef.current && 
+        outerOrbitRef.current && 
+        planetImgRef.current && 
+        planetAbsImgRef.current
+      ) {
+        angle += 0.2; // Base speed for animations
+        
+        innerOrbitRef.current.style.transform = `translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(${angle}deg) skew(0deg)`;
+        outerOrbitRef.current.style.transform = `translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(${angle * 0.5}deg) skew(0deg)`; // Outline-Orbit at half speed
+        planetImgRef.current.style.transform = `translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(${angle * 0.25}deg) skew(0deg)`; // Earth at quarter speed
+        planetAbsImgRef.current.style.transform = `translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(${angle * 0.25}deg) skew(0deg)`; // Earth shadow matches Earth
+        
+        animationId = requestAnimationFrame(animateFrame);
       }
     };
-    animate();
+
+    // Start animation only if all refs are available
+    if (
+      innerOrbitRef.current && 
+      outerOrbitRef.current && 
+      planetImgRef.current && 
+      planetAbsImgRef.current
+    ) {
+      animationId = requestAnimationFrame(animateFrame);
+    }
+
+    // Cleanup function to cancel animation on unmount
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+    };
   }, []);
 
   return (
