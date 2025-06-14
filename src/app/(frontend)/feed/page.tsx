@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { readContract } from '@wagmi/core';
+import { config } from '@/lib/config';
+import contractABI from '@/lib/contractutils.json';
+import contractAddress from '@/lib/contractAddress.json';
 import { 
-
   Unlock, 
   Vote, 
   Sparkles, 
@@ -14,14 +17,22 @@ import {
   Share, 
   Trophy,
   Zap,
-
   Hash,
   User,
-
   ChevronDown,
   Filter,
+  } from 'lucide-react';
 
-} from 'lucide-react';
+interface Capsule {
+  id: bigint;
+  creator: string;
+  recipient: string;
+  unlockTime: bigint;
+  encryptedURI: string;
+  lockType: number;
+  visibility: number;
+  isOpened: boolean;
+}
 
 interface Post {
   id: number;
@@ -99,15 +110,114 @@ const postTypeConfig = {
   }
 };
 
+// Utility function to format addresses
+const formatAddress = (address: string) => {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
+// Function to fetch all capsules from the contract
+const fetchAllCapsules = async (): Promise<Capsule[]> => {
+  try {
+    const result = await readContract(config, {
+      address: contractAddress as `0x${string}`,
+      abi: contractABI,
+      functionName: 'getAllCapsules',
+    });
+    return result as Capsule[];
+  } catch (error) {
+    console.error('Error fetching capsules:', error);
+    return [];
+  }
+};
+
+// Function to transform capsules into feed posts
+const transformCapsulesIntoPosts = (capsules: Capsule[]): Post[] => {
+  return capsules.map((capsule, index) => {
+    const now = Date.now();
+    const unlockTime = Number(capsule.unlockTime) * 1000; // Convert to milliseconds
+    const isUnlocked = now >= unlockTime || capsule.isOpened;
+    const timeUntilUnlock = unlockTime - now;
+    
+    // Determine post type based on capsule state
+    let postType: Post['type'] = 'mint';
+    let title = '';
+    let content = '';
+    
+    if (isUnlocked && capsule.isOpened) {
+      postType = 'unlock';
+      title = 'Time Capsule Revealed!';
+      content = `Capsule #${capsule.id.toString()} has been unlocked and opened, revealing its hidden contents.`;
+    } else if (isUnlocked && !capsule.isOpened) {
+      postType = 'unlock';
+      title = 'Time Capsule Ready to Open!';
+      content = `Capsule #${capsule.id.toString()} is now unlocked and ready to be opened.`;
+    } else {
+      postType = 'mint';
+      title = 'New Time Capsule Created';
+      content = `A new time capsule #${capsule.id.toString()} has been minted and is waiting to be unlocked.`;
+    }
+
+    // Check if it's a gift (creator != recipient)
+    if (capsule.creator.toLowerCase() !== capsule.recipient.toLowerCase()) {
+      postType = 'gift';
+      title = 'Time Capsule Gifted';
+      content = `A time capsule #${capsule.id.toString()} has been gifted and is waiting to be unlocked.`;
+    }
+
+    const formatTimeRemaining = (ms: number): string => {
+      if (ms <= 0) return 'Unlocked';
+      const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      if (days > 0) return `${days}d ${hours}h remaining`;
+      if (hours > 0) return `${hours}h remaining`;
+      return 'Less than 1h remaining';
+    };
+
+    return {
+      id: Number(capsule.id),
+      type: postType,
+      title,
+      content,
+      user: {
+        address: capsule.creator,
+        name: `${formatAddress(capsule.creator)}`,
+      },
+      timestamp: formatTimeRemaining(timeUntilUnlock),
+      capsuleId: Number(capsule.id),
+      capsuleTitle: `Capsule #${capsule.id.toString()}`,
+      likes: Math.floor(Math.random() * 50), // Random likes for demo
+      comments: Math.floor(Math.random() * 10),
+      shares: Math.floor(Math.random() * 5),
+      isLiked: false,
+      tags: [
+        capsule.lockType === 0 ? 'time-locked' : 'block-locked',
+        capsule.visibility === 0 ? 'private' : 'public',
+        isUnlocked ? 'unlocked' : 'locked'
+      ],
+      metadata: {
+        rarity: 'common' as const,
+        recipient: capsule.recipient !== capsule.creator ? formatAddress(capsule.recipient) : undefined,
+      }
+    };
+  });
+};
+
 export default function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'mint' | 'unlock' | 'vote' | 'gift'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Mock real-time data simulation
+  // Fetch real capsules and mock data
   useEffect(() => {
-    const initialPosts: Post[] = [
+    const loadFeedData = async () => {
+      try {
+        // Fetch real capsules from contract
+        const capsules = await fetchAllCapsules();
+        const capsulePosts = transformCapsulesIntoPosts(capsules);
+        
+        // Mock posts for demo purposes
+        const mockPosts: Post[] = [
       {
         id: 1,
         type: 'mint',
@@ -239,13 +349,44 @@ export default function Feed() {
         metadata: {
           rewards: ['Challenge Winner NFT', '1500 CAPS']
         }
-      }
-    ];
+        }
+      ];
 
-    setTimeout(() => {
-      setPosts(initialPosts);
-      setIsLoading(false);
-    }, 1000);
+      // Combine real capsule posts with mock posts
+      const allPosts = [...capsulePosts, ...mockPosts];
+      
+      setTimeout(() => {
+        setPosts(allPosts);
+        setIsLoading(false);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error loading feed data:', error);
+      // Fallback to mock data only
+      const mockPosts: Post[] = [
+        {
+          id: 1,
+          type: 'mint',
+          title: 'Error Loading Real Data',
+          content: 'Unable to fetch capsules from blockchain. Showing demo data.',
+          user: { address: '0x0000...0000', name: 'System' },
+          timestamp: 'Just now',
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          isLiked: false,
+          tags: ['error', 'demo']
+        }
+      ];
+      
+      setTimeout(() => {
+        setPosts(mockPosts);
+        setIsLoading(false);
+      }, 1000);
+    }
+  };
+
+  loadFeedData();
 
     // Simulate real-time updates
     const interval = setInterval(() => {
@@ -281,10 +422,6 @@ export default function Feed() {
         ? { ...post, isLiked: !post.isLiked, likes: post.isLiked ? post.likes - 1 : post.likes + 1 }
         : post
     ));
-  };
-
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
   return (
