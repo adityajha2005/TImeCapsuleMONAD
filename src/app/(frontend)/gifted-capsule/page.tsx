@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { Clock, Lock, Unlock, Gift, Zap, Users, Calendar, Sparkles, Timer, Globe, Eye, ExternalLink, X } from 'lucide-react';
+import { Clock, Lock, Unlock, Gift, Zap, Users, Calendar, Sparkles, Timer, Globe, Eye, ExternalLink, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import {
@@ -203,14 +203,16 @@ export default function GiftedCapsules() {
   const [hoveredCapsule, setHoveredCapsule] = useState<bigint | null>(null);
   const [viewingCapsule, setViewingCapsule] = useState<GiftedCapsuleDisplay | null>(null);
   const [showContentModal, setShowContentModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [itemsPerPage] = useState(6); // Show 6 capsules per page
 
   // Contract hooks
   const { data: ownedCapsuleIds, isLoading: isLoadingCapsules } = useGetOwnedCapsules(address || '');
   const { unlockCapsule, hash: unlockHash, isPending: isUnlocking } = useUnlockCapsule();
   const { isLoading: isUnlockLoading, isSuccess: isUnlockSuccess } = useTransactionReceipt(unlockHash);
 
-  // Get capsule data for owned capsules - limit to first 10 for performance
-  const capsuleIds = Array.isArray(ownedCapsuleIds) ? ownedCapsuleIds.slice(0, 10) : [];
+  // Get capsule data for owned capsules - limit to first 20 for better display
+  const capsuleIds = Array.isArray(ownedCapsuleIds) ? ownedCapsuleIds.slice(0, 20) : [];
   
   // Call hooks for each capsule at the top level (fixed number of hooks)
   const capsule0 = useGetCapsule(capsuleIds[0] || BigInt(0));
@@ -223,6 +225,16 @@ export default function GiftedCapsules() {
   const capsule7 = useGetCapsule(capsuleIds[7] || BigInt(0));
   const capsule8 = useGetCapsule(capsuleIds[8] || BigInt(0));
   const capsule9 = useGetCapsule(capsuleIds[9] || BigInt(0));
+  const capsule10 = useGetCapsule(capsuleIds[10] || BigInt(0));
+  const capsule11 = useGetCapsule(capsuleIds[11] || BigInt(0));
+  const capsule12 = useGetCapsule(capsuleIds[12] || BigInt(0));
+  const capsule13 = useGetCapsule(capsuleIds[13] || BigInt(0));
+  const capsule14 = useGetCapsule(capsuleIds[14] || BigInt(0));
+  const capsule15 = useGetCapsule(capsuleIds[15] || BigInt(0));
+  const capsule16 = useGetCapsule(capsuleIds[16] || BigInt(0));
+  const capsule17 = useGetCapsule(capsuleIds[17] || BigInt(0));
+  const capsule18 = useGetCapsule(capsuleIds[18] || BigInt(0));
+  const capsule19 = useGetCapsule(capsuleIds[19] || BigInt(0));
 
   // Collect all capsule data
   const allCapsuleData = [
@@ -236,6 +248,16 @@ export default function GiftedCapsules() {
     { id: capsuleIds[7], data: capsule7.data },
     { id: capsuleIds[8], data: capsule8.data },
     { id: capsuleIds[9], data: capsule9.data },
+    { id: capsuleIds[10], data: capsule10.data },
+    { id: capsuleIds[11], data: capsule11.data },
+    { id: capsuleIds[12], data: capsule12.data },
+    { id: capsuleIds[13], data: capsule13.data },
+    { id: capsuleIds[14], data: capsule14.data },
+    { id: capsuleIds[15], data: capsule15.data },
+    { id: capsuleIds[16], data: capsule16.data },
+    { id: capsuleIds[17], data: capsule17.data },
+    { id: capsuleIds[18], data: capsule18.data },
+    { id: capsuleIds[19], data: capsule19.data },
   ].filter(item => item.id && item.data);
 
   // Process capsule data
@@ -303,7 +325,12 @@ export default function GiftedCapsules() {
         } as GiftedCapsuleDisplay;
       });
     
-    return processedCapsules.filter((capsule): capsule is GiftedCapsuleDisplay => capsule !== null);
+    return processedCapsules
+      .filter((capsule): capsule is GiftedCapsuleDisplay => capsule !== null)
+      .sort((a, b) => {
+        // Sort by unlock time (most recent first)
+        return Number(b.unlockTime) - Number(a.unlockTime);
+      });
   }, [allCapsuleData]);
 
   const filteredCapsules = giftedCapsules.filter(capsule => {
@@ -311,6 +338,40 @@ export default function GiftedCapsules() {
     if (selectedFilter === 'unlocked') return capsule.isUnlocked;
     return true;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCapsules.length / itemsPerPage);
+  const startIndex = currentPage * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentCapsules = filteredCapsules.slice(startIndex, endIndex);
+
+  // Reset to first page when filter changes
+  const handleFilterChange = (filter: 'all' | 'locked' | 'unlocked') => {
+    setSelectedFilter(filter);
+    setCurrentPage(0);
+  };
+
+  const nextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1));
+  };
+
+  const prevPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 0));
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && currentPage > 0) {
+        prevPage();
+      } else if (e.key === 'ArrowRight' && currentPage < totalPages - 1) {
+        nextPage();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [currentPage, totalPages]);
 
   const getProgressPercentage = (capsule: GiftedCapsuleDisplay) => {
     if (capsule.unlockCondition === 'Time-based' && capsule.unlockDate) {
@@ -484,7 +545,7 @@ export default function GiftedCapsules() {
           {['all', 'locked', 'unlocked'].map((filter) => (
             <motion.button
               key={filter}
-              onClick={() => setSelectedFilter(filter as any)}
+              onClick={() => handleFilterChange(filter as any)}
               className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                 selectedFilter === filter
                   ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/25'
@@ -512,11 +573,69 @@ export default function GiftedCapsules() {
         </div>
       )}
 
+      {/* Results Summary */}
+      {filteredCapsules.length > 0 && (
+        <div className="text-center mb-6 relative z-10">
+          <p className="text-gray-400">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredCapsules.length)} of {filteredCapsules.length} capsules
+            {totalPages > 1 && ` • Page ${currentPage + 1} of ${totalPages}`}
+          </p>
+        </div>
+      )}
+
       {/* Capsules Grid */}
       {filteredCapsules.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10">
-          <AnimatePresence mode="popLayout">
-            {filteredCapsules.map((capsule, index) => {
+        <div className="relative z-10">
+          {/* Carousel Navigation */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mb-6">
+              <button
+                onClick={prevPage}
+                disabled={currentPage === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </button>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-gray-400 text-sm">
+                  Page {currentPage + 1} of {totalPages}
+                </span>
+                <div className="flex gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentPage(i)}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        i === currentPage ? 'bg-cyan-400' : 'bg-gray-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+              
+              <button
+                onClick={nextPage}
+                disabled={currentPage === totalPages - 1}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <motion.div 
+            key={currentPage}
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.3 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          >
+            <AnimatePresence mode="popLayout">
+              {currentCapsules.map((capsule, index) => {
               const TypeIcon = capsuleTypeIcons[capsule.type];
               const progress = getProgressPercentage(capsule);
               const canUnlock = !capsule.isUnlocked && capsule.timeRemaining <= 0;
@@ -689,6 +808,7 @@ export default function GiftedCapsules() {
               );
             })}
           </AnimatePresence>
+          </motion.div>
         </div>
       ) : !isLoadingCapsules ? (
         <motion.div

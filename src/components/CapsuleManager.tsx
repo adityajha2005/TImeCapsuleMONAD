@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { Clock, Lock, Unlock, Eye, MessageSquare, Zap, Target, Image, X } from 'lucide-react';
+import { Clock, Lock, Unlock, Eye, MessageSquare, Zap, Target, Image, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   useGetOwnedCapsules,
   useGetCapsule,
@@ -348,6 +348,8 @@ const CapsuleManager: React.FC = () => {
   const [selectedCapsules, setSelectedCapsules] = useState<bigint[]>([]);
   const [viewingCapsule, setViewingCapsule] = useState<Capsule | null>(null);
   const [showContentModal, setShowContentModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [itemsPerPage] = useState(6); // Show 6 capsules per page
 
   // Contract hooks
   const { data: ownedCapsuleIds, isLoading: isLoadingCapsules } = useGetOwnedCapsules(address || '');
@@ -358,16 +360,90 @@ const CapsuleManager: React.FC = () => {
   const { isLoading: isUnlockLoading, isSuccess: isUnlockSuccess } = useTransactionReceipt(unlockHash);
   const { isLoading: isGiftLoading, isSuccess: isGiftSuccess } = useTransactionReceipt(giftHash);
 
-  // Get capsule data for first few capsules (for demo)
-  const capsuleIds = Array.isArray(ownedCapsuleIds) ? ownedCapsuleIds : [];
-  const { data: capsule1Data } = useGetCapsule(capsuleIds[0] || BigInt(0));
-  const { data: capsule2Data } = useGetCapsule(capsuleIds[1] || BigInt(0));
-  const { data: capsule3Data } = useGetCapsule(capsuleIds[2] || BigInt(0));
+  // Get capsule data for up to 20 capsules
+  const capsuleIds = Array.isArray(ownedCapsuleIds) ? ownedCapsuleIds.slice(0, 20) : [];
+  
+  // Call hooks for each capsule at the top level (fixed number of hooks)
+  const capsule0 = useGetCapsule(capsuleIds[0] || BigInt(0));
+  const capsule1 = useGetCapsule(capsuleIds[1] || BigInt(0));
+  const capsule2 = useGetCapsule(capsuleIds[2] || BigInt(0));
+  const capsule3 = useGetCapsule(capsuleIds[3] || BigInt(0));
+  const capsule4 = useGetCapsule(capsuleIds[4] || BigInt(0));
+  const capsule5 = useGetCapsule(capsuleIds[5] || BigInt(0));
+  const capsule6 = useGetCapsule(capsuleIds[6] || BigInt(0));
+  const capsule7 = useGetCapsule(capsuleIds[7] || BigInt(0));
+  const capsule8 = useGetCapsule(capsuleIds[8] || BigInt(0));
+  const capsule9 = useGetCapsule(capsuleIds[9] || BigInt(0));
+  const capsule10 = useGetCapsule(capsuleIds[10] || BigInt(0));
+  const capsule11 = useGetCapsule(capsuleIds[11] || BigInt(0));
+  const capsule12 = useGetCapsule(capsuleIds[12] || BigInt(0));
+  const capsule13 = useGetCapsule(capsuleIds[13] || BigInt(0));
+  const capsule14 = useGetCapsule(capsuleIds[14] || BigInt(0));
+  const capsule15 = useGetCapsule(capsuleIds[15] || BigInt(0));
+  const capsule16 = useGetCapsule(capsuleIds[16] || BigInt(0));
+  const capsule17 = useGetCapsule(capsuleIds[17] || BigInt(0));
+  const capsule18 = useGetCapsule(capsuleIds[18] || BigInt(0));
+  const capsule19 = useGetCapsule(capsuleIds[19] || BigInt(0));
 
-  const capsules = [capsule1Data, capsule2Data, capsule3Data]
-    .filter(Boolean)
-    .map(formatCapsuleData)
-    .filter((capsule): capsule is Capsule => capsule !== null);
+  // Collect all capsule data
+  const allCapsuleData = [
+    { id: capsuleIds[0], data: capsule0.data },
+    { id: capsuleIds[1], data: capsule1.data },
+    { id: capsuleIds[2], data: capsule2.data },
+    { id: capsuleIds[3], data: capsule3.data },
+    { id: capsuleIds[4], data: capsule4.data },
+    { id: capsuleIds[5], data: capsule5.data },
+    { id: capsuleIds[6], data: capsule6.data },
+    { id: capsuleIds[7], data: capsule7.data },
+    { id: capsuleIds[8], data: capsule8.data },
+    { id: capsuleIds[9], data: capsule9.data },
+    { id: capsuleIds[10], data: capsule10.data },
+    { id: capsuleIds[11], data: capsule11.data },
+    { id: capsuleIds[12], data: capsule12.data },
+    { id: capsuleIds[13], data: capsule13.data },
+    { id: capsuleIds[14], data: capsule14.data },
+    { id: capsuleIds[15], data: capsule15.data },
+    { id: capsuleIds[16], data: capsule16.data },
+    { id: capsuleIds[17], data: capsule17.data },
+    { id: capsuleIds[18], data: capsule18.data },
+    { id: capsuleIds[19], data: capsule19.data },
+  ].filter(item => item.id && item.data);
+
+  const capsules = allCapsuleData
+    .map(({ data }) => formatCapsuleData(data))
+    .filter((capsule): capsule is Capsule => capsule !== null)
+    .sort((a, b) => {
+      // Sort by unlock time (most recent first)
+      return Number(b.unlockTime) - Number(a.unlockTime);
+    });
+
+  // Pagination logic
+  const totalPages = Math.ceil(capsules.length / itemsPerPage);
+  const startIndex = currentPage * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentCapsules = capsules.slice(startIndex, endIndex);
+
+  const nextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1));
+  };
+
+  const prevPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 0));
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && currentPage > 0) {
+        prevPage();
+      } else if (e.key === 'ArrowRight' && currentPage < totalPages - 1) {
+        nextPage();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [currentPage, totalPages]);
 
   const handleUnlock = (capsuleId: bigint) => {
     unlockCapsule(capsuleId);
@@ -503,19 +579,78 @@ const CapsuleManager: React.FC = () => {
           </div>
         )}
 
+        {/* Results Summary */}
+        {capsules.length > 0 && (
+          <div className="text-center mb-6">
+            <p className="text-gray-400">
+              Showing {startIndex + 1}-{Math.min(endIndex, capsules.length)} of {capsules.length} capsules
+              {totalPages > 1 && ` • Page ${currentPage + 1} of ${totalPages}`}
+            </p>
+          </div>
+        )}
+
         {/* Capsules Grid */}
         {capsules.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {capsules.map((capsule, index) => (
-              <CapsuleDisplay
-                key={capsule.id.toString()}
-                capsule={capsule}
-                onUnlock={handleUnlock}
-                onGift={handleGift}
-                onViewContent={handleViewContent}
-                isUnlocking={isUnlocking || isUnlockLoading}
-              />
-            ))}
+          <div className="relative">
+            {/* Carousel Navigation */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={prevPage}
+                  disabled={currentPage === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Previous
+                </button>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400 text-sm">
+                    Page {currentPage + 1} of {totalPages}
+                  </span>
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(i)}
+                        className={`w-2 h-2 rounded-full transition-colors ${
+                          i === currentPage ? 'bg-cyan-400' : 'bg-gray-600'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                
+                <button
+                  onClick={nextPage}
+                  disabled={currentPage === totalPages - 1}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg hover:bg-gray-700/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <motion.div 
+              key={currentPage}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.3 }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {currentCapsules.map((capsule, index) => (
+                <CapsuleDisplay
+                  key={capsule.id.toString()}
+                  capsule={capsule}
+                  onUnlock={handleUnlock}
+                  onGift={handleGift}
+                  onViewContent={handleViewContent}
+                  isUnlocking={isUnlocking || isUnlockLoading}
+                />
+              ))}
+            </motion.div>
           </div>
         ) : !isLoadingCapsules ? (
           <div className="text-center py-12">

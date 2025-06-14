@@ -24,7 +24,9 @@ const CreateCapsule = () => {
     condition: '',
     isPrivate: false,
     attachments: [],
-    mediaUri: ''
+    mediaUri: '',
+    predictionConfidence: 50,
+    secretCategory: 'personal'
   });
 
   // Contract hooks
@@ -33,9 +35,9 @@ const CreateCapsule = () => {
 
   const capsuleTypes = [
     { id: 'message', label: 'Message', icon: MessageSquare, desc: 'Text-based capsule' },
-    { id: 'prediction', label: 'Prediction', icon: Target, desc: 'Future prediction' },
-    { id: 'art', label: 'Digital Art', icon: Image, desc: 'Creative content & assets' },
-    { id: 'secret', label: 'Secret', icon: Lock, desc: 'Encrypted content' }
+    { id: 'prediction', label: 'Prediction', icon: Target, desc: 'Future prediction with confidence' },
+    { id: 'art', label: 'Digital Art', icon: Image, desc: 'Requires image/media URL' },
+    { id: 'secret', label: 'Secret', icon: Lock, desc: 'Categorized secret content' }
   ];
 
   const lockTypes = [
@@ -51,7 +53,24 @@ const CreateCapsule = () => {
     { id: 'document', label: 'Documents', icon: File, accept: '.pdf,.doc,.docx,.txt', desc: 'PDF, DOC, TXT' }
   ];
 
-  const handleNext = () => setStep(Math.min(step + 1, 3));
+  const handleNext = () => {
+    // Validation for step 1
+    if (step === 1) {
+      if (capsuleData.type === 'art' && !capsuleData.mediaUri?.trim()) {
+        alert('Media URL is required for Digital Art capsules');
+        return;
+      }
+      if (capsuleData.type === 'prediction' && !capsuleData.message?.trim()) {
+        alert('Prediction statement is required for Prediction capsules');
+        return;
+      }
+      if (capsuleData.type === 'secret' && !capsuleData.message?.trim()) {
+        alert('Secret content is required for Secret capsules');
+        return;
+      }
+    }
+    setStep(Math.min(step + 1, 3));
+  };
   const handlePrev = () => setStep(Math.max(step - 1, 1));
 
   // Unicode-safe base64 encoding function
@@ -71,6 +90,20 @@ const CreateCapsule = () => {
   const handleSubmit = async () => {
     if (!isConnected) return;
 
+    // Final validation before submission
+    if (capsuleData.type === 'art' && !capsuleData.mediaUri?.trim()) {
+      alert('Media URL is required for Digital Art capsules');
+      return;
+    }
+    if (capsuleData.type === 'prediction' && !capsuleData.message?.trim()) {
+      alert('Prediction statement is required for Prediction capsules');
+      return;
+    }
+    if (capsuleData.type === 'secret' && !capsuleData.message?.trim()) {
+      alert('Secret content is required for Secret capsules');
+      return;
+    }
+
     try {
       // Create capsule content with enhanced metadata
       const capsuleContent = {
@@ -78,7 +111,22 @@ const CreateCapsule = () => {
         message: capsuleData.message,
         type: capsuleData.type,
         mediaUri: capsuleData.mediaUri,
-                 attachments: capsuleData.attachments.map((att: any) => ({
+        // Type-specific metadata
+        ...(capsuleData.type === 'prediction' && {
+          predictionConfidence: capsuleData.predictionConfidence,
+          predictionMetadata: {
+            confidenceLevel: capsuleData.predictionConfidence,
+            category: 'future_prediction'
+          }
+        }),
+        ...(capsuleData.type === 'secret' && {
+          secretCategory: capsuleData.secretCategory,
+          secretMetadata: {
+            category: capsuleData.secretCategory,
+            isEncrypted: true
+          }
+        }),
+        attachments: capsuleData.attachments.map((att: any) => ({
            id: att.id,
            name: att.name,
            size: att.size,
@@ -298,28 +346,111 @@ const CreateCapsule = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Message</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      {capsuleData.type === 'prediction' ? 'Prediction Statement (Required)' :
+                       capsuleData.type === 'secret' ? 'Secret Content (Required)' :
+                       capsuleData.type === 'art' ? 'Message (Optional)' : 'Message'}
+                    </label>
                     <textarea
                       value={capsuleData.message}
                       onChange={(e) => setCapsuleData({...capsuleData, message: e.target.value})}
                       rows={6}
-                      className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:border-cyan-400 focus:outline-none transition-colors"
-                      placeholder="What would you like to preserve for the future?"
+                      className={`w-full p-3 bg-gray-900/50 border rounded-lg focus:outline-none transition-colors ${
+                        (capsuleData.type === 'prediction' || capsuleData.type === 'secret') && !capsuleData.message?.trim()
+                          ? 'border-red-500 focus:border-red-400'
+                          : 'border-gray-700 focus:border-cyan-400'
+                      }`}
+                      placeholder={
+                        capsuleData.type === 'prediction' ? 'Enter your prediction about the future...' :
+                        capsuleData.type === 'secret' ? 'Enter your secret content...' :
+                        'What would you like to preserve for the future?'
+                      }
+                      required={capsuleData.type === 'prediction' || capsuleData.type === 'secret'}
                     />
+                    {(capsuleData.type === 'prediction' || capsuleData.type === 'secret') && !capsuleData.message?.trim() && (
+                      <p className="text-xs text-red-400 mt-1">
+                        ⚠️ {capsuleData.type === 'prediction' ? 'Prediction statement' : 'Secret content'} is required
+                      </p>
+                    )}
                   </div>
+
+                  {/* Prediction-specific fields */}
+                  {capsuleData.type === 'prediction' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Confidence Level: {capsuleData.predictionConfidence}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={capsuleData.predictionConfidence}
+                        onChange={(e) => setCapsuleData({...capsuleData, predictionConfidence: parseInt(e.target.value)})}
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        style={{
+                          background: `linear-gradient(to right, #ef4444 0%, #eab308 50%, #22c55e 100%)`,
+                        }}
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>Not confident</span>
+                        <span>Very confident</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        How confident are you in this prediction?
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Secret-specific fields */}
+                  {capsuleData.type === 'secret' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Secret Category</label>
+                      <select
+                        value={capsuleData.secretCategory}
+                        onChange={(e) => setCapsuleData({...capsuleData, secretCategory: e.target.value})}
+                        className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:border-cyan-400 focus:outline-none transition-colors"
+                      >
+                        <option value="personal">Personal Secret</option>
+                        <option value="confession">Confession</option>
+                        <option value="wish">Secret Wish</option>
+                        <option value="dream">Dream/Goal</option>
+                        <option value="memory">Hidden Memory</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Categorize your secret for better organization
+                      </p>
+                    </div>
+                  )}
                   
                   {/* Media URI Input */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Media URL (Optional)</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Media URL {capsuleData.type === 'art' ? '(Required)' : '(Optional)'}
+                    </label>
                     <input
                       type="url"
                       value={capsuleData.mediaUri || ''}
                       onChange={(e) => setCapsuleData({...capsuleData, mediaUri: e.target.value})}
-                      className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:border-cyan-400 focus:outline-none transition-colors"
+                      className={`w-full p-3 bg-gray-900/50 border rounded-lg focus:outline-none transition-colors ${
+                        capsuleData.type === 'art' && !capsuleData.mediaUri?.trim()
+                          ? 'border-red-500 focus:border-red-400'
+                          : 'border-gray-700 focus:border-cyan-400'
+                      }`}
                       placeholder="https://example.com/image.jpg or https://example.com/video.mp4"
+                      required={capsuleData.type === 'art'}
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Add a direct link to an image or video to include in your capsule
+                    <p className={`text-xs mt-1 ${
+                      capsuleData.type === 'art' && !capsuleData.mediaUri?.trim()
+                        ? 'text-red-400'
+                        : 'text-gray-500'
+                    }`}>
+                      {capsuleData.type === 'art' 
+                        ? (capsuleData.mediaUri?.trim() 
+                            ? 'Image URL is required for digital art capsules' 
+                            : '⚠️ Image URL is required for digital art capsules')
+                        : 'Add a direct link to an image or video to include in your capsule'
+                      }
                     </p>
                   </div>
                 </div>
@@ -577,6 +708,52 @@ const CreateCapsule = () => {
                     </p>
                   </div>
 
+                  {/* Media URL Display */}
+                  {capsuleData.mediaUri && (
+                    <div>
+                      <label className="text-sm text-gray-400">Media URL</label>
+                      <p className="text-cyan-400 mt-1 p-3 bg-gray-800/50 rounded-lg break-all text-sm">
+                        {capsuleData.mediaUri}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Prediction-specific display */}
+                  {capsuleData.type === 'prediction' && (
+                    <div>
+                      <label className="text-sm text-gray-400">Confidence Level</label>
+                      <div className="mt-1 p-3 bg-gray-800/50 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="text-white font-medium">{capsuleData.predictionConfidence}%</span>
+                          <div className="flex-1 mx-4">
+                            <div className="w-full bg-gray-700 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 h-2 rounded-full"
+                                style={{ width: `${capsuleData.predictionConfidence}%` }}
+                              />
+                            </div>
+                          </div>
+                          <span className="text-xs text-gray-400">
+                            {capsuleData.predictionConfidence >= 80 ? 'Very Confident' :
+                             capsuleData.predictionConfidence >= 60 ? 'Confident' :
+                             capsuleData.predictionConfidence >= 40 ? 'Somewhat Confident' :
+                             'Not Very Confident'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Secret-specific display */}
+                  {capsuleData.type === 'secret' && (
+                    <div>
+                      <label className="text-sm text-gray-400">Secret Category</label>
+                      <p className="text-white mt-1 p-3 bg-gray-800/50 rounded-lg capitalize">
+                        {capsuleData.secretCategory.replace('_', ' ')}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Digital Assets Summary */}
                   {capsuleData.type === 'art' && capsuleData.attachments.length > 0 && (
                     <div>
@@ -714,7 +891,8 @@ const CreateCapsule = () => {
                   setStep(1);
                   setCapsuleData({
                     title: '', message: '', type: 'message', lockType: 'time',
-                    unlockDate: '', blockNumber: '', condition: '', isPrivate: false, attachments: [], mediaUri: ''
+                    unlockDate: '', blockNumber: '', condition: '', isPrivate: false, attachments: [], mediaUri: '',
+                    predictionConfidence: 50, secretCategory: 'personal'
                   });
                 }}
               >
