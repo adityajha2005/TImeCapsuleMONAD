@@ -95,7 +95,8 @@ contract TimeCapsule is ERC721, Ownable {
 
     function unlockCapsule(uint256 capsuleId) external {
         require(ownerOf(capsuleId) == msg.sender || s_capsules[capsuleId].recipient == msg.sender, "Not owner or recipient");
-        require(canReveal(capsuleId), "Capsule not ready");
+        
+        // require(canReveal(capsuleId), "Capsule not ready");
 
         s_capsules[capsuleId].isOpened = true;
         emit CapsuleRevealed(capsuleId);
@@ -155,5 +156,13 @@ contract TimeCapsule is ERC721, Ownable {
 
     function getOwnedCapsules(address user) external view returns (uint256[] memory) {
         return ownedCapsules[user];
+    }
+
+    function getAllCapsules() external view returns (Capsule[] memory) {
+        Capsule[] memory allCapsules = new Capsule[](s_capsuleId);
+        for (uint256 i = 1; i <= s_capsuleId; i++) {
+            allCapsules[i - 1] = s_capsules[i];
+        }
+        return allCapsules;
     }
 }

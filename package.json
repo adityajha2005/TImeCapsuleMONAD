@@ -77,5 +77,6 @@
     "tailwindcss": "^4",
     "@tailwindcss/postcss": "^4",
     "typescript": "^5"
+
   }
 }
