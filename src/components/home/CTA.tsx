@@ -11,8 +11,7 @@ const CTA = () => {
     initial: { opacity: 0, scale: 0.8 },
     animate: { 
       opacity: 0.1, 
-      scale: 1,
-      transition: { duration: 1.2, ease: [0.25, 0.46, 0.45, 0.94] }
+      scale: 1
     }
   }
 
@@ -21,12 +20,7 @@ const CTA = () => {
     initial: { opacity: 0, x: -20 },
     animate: { 
       opacity: 1, 
-      x: 0,
-      transition: { duration: 0.6 }
-    },
-    hover: { 
-      scale: 1.05,
-      transition: { duration: 0.3 }
+      x: 0
     }
   }
 
@@ -35,8 +29,7 @@ const CTA = () => {
     initial: { opacity: 0, scale: 0.9 },
     animate: { 
       opacity: 1, 
-      scale: 1,
-      transition: { duration: 0.8 }
+      scale: 1
     }
   }
 
@@ -53,6 +46,7 @@ const CTA = () => {
           variants={gradientVariants}
           initial="initial"
           animate="animate"
+          transition={{ duration: 1.2, ease: "easeOut" }}
         />
       </div>
 
@@ -82,7 +76,8 @@ const CTA = () => {
               variants={buttonVariants}
               initial="initial"
               animate="animate"
-              whileHover="hover"
+              whileHover={{ scale: 1.05, transition: { duration: 0.3 } }}
+              transition={{ duration: 0.6 }}
             >
               <Button size="lg" className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:text-white hover:from-cyan-600 hover:to-cyan-700">
                 Start Creating Now
@@ -92,8 +87,8 @@ const CTA = () => {
               variants={buttonVariants}
               initial="initial"
               animate="animate"
-              whileHover="hover"
-              transition={{ delay: 0.2 }}
+              whileHover={{ scale: 1.05, transition: { duration: 0.3 } }}
+              transition={{ duration: 0.6, delay: 0.2 }}
             >
               <Button size="lg" variant="outline" className="border-cyan-500/50 hover:border-cyan-500">
                 <Mail className="mr-2 h-4 w-4" />
@@ -107,6 +102,7 @@ const CTA = () => {
             initial="initial"
             whileInView="animate"
             viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
             className="relative bg-black/70 backdrop-blur-sm border border-cyan-500/20 rounded-2xl p-8 h-full"
           >
             <div className=" absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500"/>
