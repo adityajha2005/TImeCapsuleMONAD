@@ -2,8 +2,17 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Lock, Image, MessageSquare, Zap, Users, Target, Upload, X, File, Video, Music } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { 
+  useMintCapsule, 
+  useTransactionReceipt, 
+  LockType, 
+  Visibility 
+} from '@/hooks/useTimeCapsule';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 const CreateCapsule = () => {
+  const { address, isConnected } = useAccount();
   const [step, setStep] = useState(1);
   const [capsuleData, setCapsuleData] = useState({
     title: '',
@@ -16,6 +25,10 @@ const CreateCapsule = () => {
     isPrivate: false,
     attachments: []
   });
+
+  // Contract hooks
+  const { mintCapsule, hash, error, isPending } = useMintCapsule();
+  const { isLoading: isMintLoading, isSuccess: isMintSuccess } = useTransactionReceipt(hash);
 
   const capsuleTypes = [
     { id: 'message', label: 'Message', icon: MessageSquare, desc: 'Text-based capsule' },
@@ -40,10 +53,42 @@ const CreateCapsule = () => {
   const handleNext = () => setStep(Math.min(step + 1, 3));
   const handlePrev = () => setStep(Math.max(step - 1, 1));
 
-  const handleSubmit = () => {
-    console.log('Creating capsule:', capsuleData);
-    // Simulate minting process
-    setStep(4);
+  const handleSubmit = async () => {
+    if (!isConnected) return;
+
+    try {
+      // Create encrypted URI from capsule data
+      const capsuleContent = {
+        title: capsuleData.title,
+        message: capsuleData.message,
+        type: capsuleData.type,
+        attachments: capsuleData.attachments,
+        createdAt: new Date().toISOString()
+      };
+      
+      // In a real implementation, you'd encrypt this content
+      const encryptedURI = `data:application/json;base64,${btoa(JSON.stringify(capsuleContent))}`;
+      
+      // Calculate unlock timestamp
+      let unlockValue: bigint;
+      let contractLockType: LockType;
+      
+      if (capsuleData.lockType === 'time') {
+        unlockValue = BigInt(Math.floor(new Date(capsuleData.unlockDate).getTime() / 1000));
+        contractLockType = LockType.TIME_BASED;
+      } else {
+        unlockValue = BigInt(capsuleData.blockNumber || '0');
+        contractLockType = LockType.BLOCK_BASED;
+      }
+      
+      const visibility = capsuleData.isPrivate ? Visibility.PRIVATE : Visibility.PUBLIC;
+      
+      // Mint the capsule
+      mintCapsule(encryptedURI, unlockValue, contractLockType, visibility);
+      setStep(4);
+    } catch (err) {
+      console.error('Error minting capsule:', err);
+    }
   };
 
   // @ts-ignore
@@ -83,6 +128,21 @@ const CreateCapsule = () => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+  // Show wallet connection if not connected
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-black pt-12 text-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-500 bg-clip-text text-transparent mb-8">
+            Connect Your Wallet
+          </h1>
+          <p className="text-gray-400 mb-8">Connect your wallet to create time capsules on Monad</p>
+          <ConnectButton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black pt-12 text-white overflow-hidden relative">
@@ -518,36 +578,82 @@ const CreateCapsule = () => {
               animate={{ opacity: 1, scale: 1 }}
               className="max-w-2xl mx-auto text-center"
             >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                className="w-24 h-24 bg-green-400/20 rounded-full flex items-center justify-center mx-auto mb-6"
-              >
-                <motion.div
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ delay: 0.5, duration: 0.5 }}
-                  className="text-green-400 text-3xl"
-                >
-                  ✓
-                </motion.div>
-              </motion.div>
-              
-              <h3 className="text-3xl font-bold text-green-400 mb-4">Capsule Created!</h3>
-              <p className="text-gray-400 mb-8">
-                Your time capsule has been successfully minted and stored on the blockchain.
-                {capsuleData.attachments.length > 0 && (
-                  <span className="block mt-2">
-                    All {capsuleData.attachments.length} digital assets have been uploaded to IPFS.
-                  </span>
-                )}
-              </p>
-              
-              <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 mb-8">
-                <p className="text-sm text-gray-400 mb-2">Transaction Hash</p>
-                <p className="font-mono text-cyan-400 break-all">0x1234...abcd</p>
-              </div>
+              {isPending || isMintLoading ? (
+                <div>
+                  <motion.div
+                    className="w-24 h-24 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full mx-auto mb-6"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  />
+                  <h3 className="text-3xl font-bold text-cyan-400 mb-4">Minting Capsule...</h3>
+                  <p className="text-gray-400 mb-8">
+                    Please confirm the transaction in your wallet and wait for it to be processed on the blockchain.
+                  </p>
+                  {error && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
+                      <p className="text-red-400 text-sm">Error: {error.message}</p>
+                    </div>
+                  )}
+                </div>
+              ) : isMintSuccess ? (
+                <div>
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                    className="w-24 h-24 bg-green-400/20 rounded-full flex items-center justify-center mx-auto mb-6"
+                  >
+                    <motion.div
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      transition={{ delay: 0.5, duration: 0.5 }}
+                      className="text-green-400 text-3xl"
+                    >
+                      ✓
+                    </motion.div>
+                  </motion.div>
+                  
+                  <h3 className="text-3xl font-bold text-green-400 mb-4">Capsule Created!</h3>
+                  <p className="text-gray-400 mb-8">
+                    Your time capsule has been successfully minted and stored on the Monad blockchain.
+                    {capsuleData.attachments.length > 0 && (
+                      <span className="block mt-2">
+                        All {capsuleData.attachments.length} digital assets have been included.
+                      </span>
+                    )}
+                  </p>
+                  
+                  {hash && (
+                    <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 mb-8">
+                      <p className="text-sm text-gray-400 mb-2">Transaction Hash</p>
+                      <p className="font-mono text-cyan-400 break-all text-sm">{hash}</p>
+                      <a 
+                        href={`https://testnet.monadexplorer.com/tx/${hash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-cyan-400 hover:text-cyan-300 text-sm mt-2 inline-block"
+                      >
+                        View on Monad Explorer →
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <div className="w-24 h-24 bg-red-400/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <div className="text-red-400 text-3xl">✗</div>
+                  </div>
+                  <h3 className="text-3xl font-bold text-red-400 mb-4">Transaction Failed</h3>
+                  <p className="text-gray-400 mb-8">
+                    There was an error creating your capsule. Please try again.
+                  </p>
+                  {error && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-8">
+                      <p className="text-red-400 text-sm">{error.message}</p>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <motion.button
                 className="px-8 py-3 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-medium transition-colors"
