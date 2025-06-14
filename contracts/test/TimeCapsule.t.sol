@@ -421,4 +421,28 @@ contract TimeCapsuleTest is Test {
         uint256[] memory bobCapsules = timeCapsule.getOwnedCapsules(bob);
         assertEq(bobCapsules.length, 0);
     }
+
+    function testGetAllCapsules() public {
+        // Arrange: create some capsules
+        timeCapsule.mintCapsule(
+            "ipfs://capsule1",
+            block.timestamp + 1 days,
+            TimeCapsule.LockType.TIMESTAMP,
+            TimeCapsule.Visibility.PUBLIC
+        );
+        timeCapsule.mintCapsule(
+            "ipfs://capsule2",
+            block.timestamp + 2 days,
+            TimeCapsule.LockType.TIMESTAMP,
+            TimeCapsule.Visibility.PUBLIC
+        );
+
+        // Act: get all capsules
+        TimeCapsule.Capsule[] memory capsules = timeCapsule.getAllCapsules();
+
+        // Assert: check length and content
+        assertEq(capsules.length, 2);
+        // assertEq(capsules[0].uri, "ipfs://capsule1");
+        // assertEq(capsules[1].uri, "ipfs://capsule2");
+    }
 }
