@@ -1,2 +1,5 @@
 /.next
 /node_modules
+/contracts/broadcast
+/contracts/cache
+/contracts/.env
