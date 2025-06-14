@@ -502,24 +502,18 @@ export default function GiftedCapsules() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
-        <div className="bg-gradient-to-br from-stone-950/20 via-stone-950 to-stone-950/20 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-6">
-          <div className=" absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500"/>
-
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 text-center">
           <h3 className="text-lg font-semibold text-cyan-400 mb-2">Total Gifted</h3>
           <p className="text-3xl font-bold text-white">{giftedCapsules.length}</p>
         </div>
-        <div className="bg-gradient-to-br from-stone-950/20 via-stone-950 to-stone-950/20 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-6">
-          <div className=" absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500"/>
-
-          <h3 className="text-lg font-semibold text-green-500 mb-2">Unlocked</h3>
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 text-center">
+          <h3 className="text-lg font-semibold text-green-400 mb-2">Unlocked</h3>
           <p className="text-3xl font-bold text-white">
             {giftedCapsules.filter(c => c.isUnlocked).length}
           </p>
         </div>
-        <div className="bg-gradient-to-br from-stone-950/20 via-stone-950 to-stone-950/20 backdrop-blur-sm border border-cyan-500/20 rounded-xl p-6">
-          <div className=" absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500"/>
-
-          <h3 className="text-lg font-semibold text-red-500 mb-2">Locked</h3>
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 text-center">
+          <h3 className="text-lg font-semibold text-red-400 mb-2">Locked</h3>
           <p className="text-3xl font-bold text-white">
             {giftedCapsules.filter(c => !c.isUnlocked).length}
           </p>
@@ -547,7 +541,7 @@ export default function GiftedCapsules() {
 
       {/* Filter Tabs */}
       <div className="flex justify-center mb-8 relative z-10">
-        <div className="bg-stone-800/50 backdrop-blur-sm rounded-full p-1 border border-slate-700">
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-full p-1 border border-slate-700">
           {['all', 'locked', 'unlocked'].map((filter) => (
             <motion.button
               key={filter}
