@@ -62,6 +62,141 @@ const rarityGlows = {
   legendary: 'shadow-amber-500/20'
 };
 
+// MediaRenderer component that fetches and renders media
+interface MediaRendererProps {
+  mediaUri: string;
+}
+
+const MediaRenderer: React.FC<MediaRendererProps> = ({ mediaUri }) => {
+  const [mediaData, setMediaData] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'unknown'>('unknown');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchMedia = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // First, try to determine the media type from URL
+        const isImage = mediaUri.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+        const isVideo = mediaUri.match(/\.(mp4|webm|avi|mov)$/i);
+
+        if (isImage) {
+          setMediaType('image');
+        } else if (isVideo) {
+          setMediaType('video');
+        } else {
+          // Try to fetch and determine from content-type
+          const response = await fetch(mediaUri, { method: 'HEAD' });
+          const contentType = response.headers.get('content-type');
+          
+          if (contentType?.startsWith('image/')) {
+            setMediaType('image');
+          } else if (contentType?.startsWith('video/')) {
+            setMediaType('video');
+          } else {
+            setMediaType('unknown');
+          }
+        }
+
+        // For images, fetch as blob and create object URL
+        if (mediaType === 'image' || isImage) {
+          const response = await fetch(mediaUri);
+          if (!response.ok) throw new Error('Failed to fetch media');
+          
+          const blob = await response.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          setMediaData(objectUrl);
+        } else {
+          // For videos and unknown types, use the original URL
+          setMediaData(mediaUri);
+        }
+      } catch (err) {
+        console.error('Error fetching media:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load media');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMedia();
+
+    // Cleanup object URL on unmount
+    return () => {
+      if (mediaData && mediaData.startsWith('blob:')) {
+        URL.revokeObjectURL(mediaData);
+      }
+    };
+  }, [mediaUri]);
+
+  if (loading) {
+    return (
+      <div>
+        <h4 className="text-lg font-semibold text-white mb-2">Media</h4>
+        <div className="bg-gray-800/50 rounded-lg p-4">
+          <div className="flex items-center justify-center h-32">
+            <div className="w-8 h-8 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+            <span className="ml-3 text-gray-400">Loading media...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h4 className="text-lg font-semibold text-white mb-2">Media</h4>
+        <div className="bg-gray-800/50 rounded-lg p-4">
+          <div className="text-red-400 text-sm mb-2">Failed to load media: {error}</div>
+          <a 
+            href={mediaUri} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-cyan-400 hover:text-cyan-300 underline break-all"
+          >
+            Open original link
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h4 className="text-lg font-semibold text-white mb-2">Media</h4>
+      <div className="bg-gray-800/50 rounded-lg p-4">
+        {mediaType === 'image' && mediaData ? (
+          <img 
+            src={mediaData} 
+            alt="Capsule media"
+            className="max-w-full h-auto rounded-lg"
+            onError={() => setError('Failed to display image')}
+          />
+        ) : mediaType === 'video' && mediaData ? (
+          <video 
+            src={mediaData} 
+            controls
+            className="max-w-full h-auto rounded-lg"
+            onError={() => setError('Failed to display video')}
+          />
+        ) : (
+          <a 
+            href={mediaUri} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-cyan-400 hover:text-cyan-300 underline break-all"
+          >
+            {mediaUri}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function GiftedCapsules() {
   const { address, isConnected } = useAccount();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'locked' | 'unlocked'>('all');
@@ -213,8 +348,20 @@ export default function GiftedCapsules() {
     try {
       if (encryptedURI.startsWith('data:application/json;base64,')) {
         const base64Data = encryptedURI.replace('data:application/json;base64,', '');
-        const jsonString = atob(base64Data);
-        return JSON.parse(jsonString);
+        try {
+          // Try Unicode-safe decoding first
+          const binaryString = atob(base64Data);
+          const utf8Bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            utf8Bytes[i] = binaryString.charCodeAt(i);
+          }
+          const jsonString = new TextDecoder().decode(utf8Bytes);
+          return JSON.parse(jsonString);
+        } catch (unicodeError) {
+          // Fallback to regular atob for older capsules
+          const jsonString = atob(base64Data);
+          return JSON.parse(jsonString);
+        }
       } else if (encryptedURI.startsWith('data:application/json,')) {
         const jsonString = decodeURIComponent(encryptedURI.replace('data:application/json,', ''));
         return JSON.parse(jsonString);
@@ -626,6 +773,11 @@ export default function GiftedCapsules() {
                       </div>
                     )}
 
+                    {/* Media Content */}
+                    {content.mediaUri && (
+                      <MediaRenderer mediaUri={content.mediaUri} />
+                    )}
+
                     {content.type && (
                       <div>
                         <h4 className="text-lg font-semibold text-white mb-2">Type</h4>
@@ -653,16 +805,30 @@ export default function GiftedCapsules() {
                       </div>
                     )}
 
-                    {content.createdAt && (
-                      <div>
-                        <h4 className="text-lg font-semibold text-white mb-2">Created</h4>
-                        <p className="text-gray-300">
-                          {new Date(content.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                    )}
+                                         {content.createdAt && (
+                       <div>
+                         <h4 className="text-lg font-semibold text-white mb-2">Created</h4>
+                         <p className="text-gray-300">
+                           {new Date(content.createdAt).toLocaleString()}
+                         </p>
+                       </div>
+                     )}
 
-                    <div className="pt-4 border-t border-gray-700">
+                     {content.creator && (
+                       <div>
+                         <h4 className="text-lg font-semibold text-white mb-2">Original Creator</h4>
+                         <p className="text-gray-300 font-mono text-sm">{content.creator}</p>
+                       </div>
+                     )}
+
+                     {content.network && (
+                       <div>
+                         <h4 className="text-lg font-semibold text-white mb-2">Network</h4>
+                         <p className="text-gray-300 capitalize">{content.network}</p>
+                       </div>
+                     )}
+
+                     <div className="pt-4 border-t border-gray-700">
                       <div className="flex items-center space-x-2 text-green-400">
                         <Unlock className="w-5 h-5" />
                         <span className="font-semibold">Capsule Unlocked!</span>

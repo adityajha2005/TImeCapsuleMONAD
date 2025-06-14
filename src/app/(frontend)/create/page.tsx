@@ -23,7 +23,8 @@ const CreateCapsule = () => {
     blockNumber: '',
     condition: '',
     isPrivate: false,
-    attachments: []
+    attachments: [],
+    mediaUri: ''
   });
 
   // Contract hooks
@@ -53,21 +54,56 @@ const CreateCapsule = () => {
   const handleNext = () => setStep(Math.min(step + 1, 3));
   const handlePrev = () => setStep(Math.max(step - 1, 1));
 
+  // Unicode-safe base64 encoding function
+  const unicodeToBase64 = (str: string): string => {
+    try {
+      // Convert string to UTF-8 bytes, then to base64
+      const utf8Bytes = new TextEncoder().encode(str);
+      const binaryString = Array.from(utf8Bytes, byte => String.fromCharCode(byte)).join('');
+      return btoa(binaryString);
+    } catch (error) {
+      console.error('Error encoding to base64:', error);
+      // Fallback: use URL encoding instead of base64
+      return encodeURIComponent(str);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!isConnected) return;
 
     try {
-      // Create encrypted URI from capsule data
+      // Create capsule content with enhanced metadata
       const capsuleContent = {
         title: capsuleData.title,
         message: capsuleData.message,
         type: capsuleData.type,
-        attachments: capsuleData.attachments,
-        createdAt: new Date().toISOString()
+        mediaUri: capsuleData.mediaUri,
+                 attachments: capsuleData.attachments.map((att: any) => ({
+           id: att.id,
+           name: att.name,
+           size: att.size,
+           type: att.type,
+           // Note: File content would need to be uploaded to IPFS or similar for full on-chain storage
+           preview: att.preview ? 'preview_available' : null
+         })),
+        createdAt: new Date().toISOString(),
+        creator: address,
+        version: '1.0',
+        network: 'monad-testnet'
       };
       
-      // In a real implementation, you'd encrypt this content
-      const encryptedURI = `data:application/json;base64,${btoa(JSON.stringify(capsuleContent))}`;
+      let encryptedURI: string;
+      
+      try {
+        // Try Unicode-safe base64 encoding first
+        const jsonString = JSON.stringify(capsuleContent);
+        const base64Data = unicodeToBase64(jsonString);
+        encryptedURI = `data:application/json;base64,${base64Data}`;
+      } catch (encodingError) {
+        console.warn('Base64 encoding failed, using URL encoding fallback:', encodingError);
+        // Fallback: use URL encoding instead of base64
+        encryptedURI = `data:application/json,${encodeURIComponent(JSON.stringify(capsuleContent))}`;
+      }
       
       // Calculate unlock timestamp
       let unlockValue: bigint;
@@ -270,6 +306,21 @@ const CreateCapsule = () => {
                       className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:border-cyan-400 focus:outline-none transition-colors"
                       placeholder="What would you like to preserve for the future?"
                     />
+                  </div>
+                  
+                  {/* Media URI Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Media URL (Optional)</label>
+                    <input
+                      type="url"
+                      value={capsuleData.mediaUri || ''}
+                      onChange={(e) => setCapsuleData({...capsuleData, mediaUri: e.target.value})}
+                      className="w-full p-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:border-cyan-400 focus:outline-none transition-colors"
+                      placeholder="https://example.com/image.jpg or https://example.com/video.mp4"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Add a direct link to an image or video to include in your capsule
+                    </p>
                   </div>
                 </div>
               </div>
@@ -663,7 +714,7 @@ const CreateCapsule = () => {
                   setStep(1);
                   setCapsuleData({
                     title: '', message: '', type: 'message', lockType: 'time',
-                    unlockDate: '', blockNumber: '', condition: '', isPrivate: false, attachments: []
+                    unlockDate: '', blockNumber: '', condition: '', isPrivate: false, attachments: [], mediaUri: ''
                   });
                 }}
               >
