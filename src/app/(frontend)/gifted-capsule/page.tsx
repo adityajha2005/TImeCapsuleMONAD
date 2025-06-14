@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { Clock, Lock, Unlock, Gift, Zap, Users, Calendar, Sparkles, Timer, Globe, Eye, ExternalLink } from 'lucide-react';
+import { Clock, Lock, Unlock, Gift, Zap, Users, Calendar, Sparkles, Timer, Globe, Eye, ExternalLink, X } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import {
@@ -66,6 +66,8 @@ export default function GiftedCapsules() {
   const { address, isConnected } = useAccount();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'locked' | 'unlocked'>('all');
   const [hoveredCapsule, setHoveredCapsule] = useState<bigint | null>(null);
+  const [viewingCapsule, setViewingCapsule] = useState<GiftedCapsuleDisplay | null>(null);
+  const [showContentModal, setShowContentModal] = useState(false);
 
   // Contract hooks
   const { data: ownedCapsuleIds, isLoading: isLoadingCapsules } = useGetOwnedCapsules(address || '');
@@ -200,6 +202,28 @@ export default function GiftedCapsules() {
 
   const handleUnlock = (capsuleId: bigint) => {
     unlockCapsule(capsuleId);
+  };
+
+  const handleViewContent = (capsule: GiftedCapsuleDisplay) => {
+    setViewingCapsule(capsule);
+    setShowContentModal(true);
+  };
+
+  const parseEncryptedURI = (encryptedURI: string) => {
+    try {
+      if (encryptedURI.startsWith('data:application/json;base64,')) {
+        const base64Data = encryptedURI.replace('data:application/json;base64,', '');
+        const jsonString = atob(base64Data);
+        return JSON.parse(jsonString);
+      } else if (encryptedURI.startsWith('data:application/json,')) {
+        const jsonString = decodeURIComponent(encryptedURI.replace('data:application/json,', ''));
+        return JSON.parse(jsonString);
+      }
+      return { message: 'Unable to decode content', title: 'Unknown' };
+    } catch (error) {
+      console.error('Error parsing encrypted URI:', error);
+      return { message: 'Error decoding content', title: 'Error' };
+    }
   };
 
   const formatAddress = (address: string) => {
@@ -466,7 +490,10 @@ export default function GiftedCapsules() {
                     {/* Actions */}
                     <div className="flex gap-3">
                       {capsule.isUnlocked ? (
-                        <button className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <button 
+                          onClick={() => handleViewContent(capsule)}
+                          className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
                           <Eye className="w-4 h-4" />
                           View Content
                         </button>
@@ -538,6 +565,119 @@ export default function GiftedCapsules() {
           </Link>
         </motion.div>
       ) : null}
+
+      {/* Content Viewing Modal */}
+      <AnimatePresence>
+        {showContentModal && viewingCapsule && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            onClick={() => setShowContentModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-gray-900 border border-gray-700 rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-cyan-400">
+                  {viewingCapsule.title} - Capsule #{viewingCapsule.id.toString()}
+                </h3>
+                <button
+                  onClick={() => setShowContentModal(false)}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-400" />
+                </button>
+              </div>
+
+              {(() => {
+                const content = parseEncryptedURI(viewingCapsule.encryptedURI);
+                return (
+                  <div className="space-y-6">
+                    {/* Gift Info */}
+                    <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Gift className="w-5 h-5 text-purple-400" />
+                        <span className="text-lg font-semibold text-purple-300">Gifted Capsule</span>
+                      </div>
+                      <p className="text-gray-300">
+                        This capsule was gifted to you by: <span className="font-mono text-cyan-400">{formatAddress(viewingCapsule.giftedBy || '')}</span>
+                      </p>
+                    </div>
+
+                    {content.title && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-2">Title</h4>
+                        <p className="text-gray-300">{content.title}</p>
+                      </div>
+                    )}
+                    
+                    {content.message && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-2">Message</h4>
+                        <div className="bg-gray-800/50 rounded-lg p-4">
+                          <p className="text-gray-300 whitespace-pre-wrap">{content.message}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {content.type && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-2">Type</h4>
+                        <p className="text-gray-300 capitalize">{content.type}</p>
+                      </div>
+                    )}
+
+                    {content.attachments && content.attachments.length > 0 && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-2">Attachments</h4>
+                        <div className="space-y-2">
+                          {content.attachments.map((attachment: any, index: number) => (
+                            <div key={index} className="bg-gray-800/50 rounded-lg p-3">
+                              <p className="text-gray-300 text-sm">
+                                📎 {attachment.name} ({attachment.type})
+                              </p>
+                              {attachment.size && (
+                                <p className="text-gray-500 text-xs">
+                                  Size: {(attachment.size / 1024).toFixed(1)} KB
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {content.createdAt && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-white mb-2">Created</h4>
+                        <p className="text-gray-300">
+                          {new Date(content.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="pt-4 border-t border-gray-700">
+                      <div className="flex items-center space-x-2 text-green-400">
+                        <Unlock className="w-5 h-5" />
+                        <span className="font-semibold">Capsule Unlocked!</span>
+                      </div>
+                      <p className="text-sm text-green-300 mt-1">
+                        This content has been permanently revealed on the blockchain.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

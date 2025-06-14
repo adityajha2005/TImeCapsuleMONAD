@@ -4,7 +4,7 @@
 This guide documents the integration of TimeCapsule smart contract with the frontend application using Wagmi hooks and RainbowKit for wallet connectivity.
 
 ## Contract Details
-- **Contract Address**: `0x91C2a5c5288a99666884FA44659aeCF7c19962C2`
+- **Contract Address**: `0xa81bD52E1beB90B4e665E595bb5b700bdD05c443`
 - **Network**: Monad Testnet
 - **Contract Type**: ERC721 NFT with time-locking functionality
 
