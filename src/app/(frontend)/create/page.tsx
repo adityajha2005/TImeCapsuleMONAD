@@ -784,7 +784,7 @@ const CreateCapsule = () => {
                   </div>
                 </div>
                 
-                <div className="mt-8 p-4 bg-cyan-400/10 border border-cyan-400/30 rounded-lg">
+                {/* <div className="mt-8 p-4 bg-cyan-400/10 border border-cyan-400/30 rounded-lg">
                   <p className="text-sm text-cyan-300">
                     <strong>Estimated minting cost:</strong> {0.025 + (capsuleData.attachments.length * 0.01)} ETH + gas fees
                     {capsuleData.attachments.length > 0 && (
@@ -793,7 +793,7 @@ const CreateCapsule = () => {
                       </span>
                     )}
                   </p>
-                </div>
+                </div> */}
               </div>
             </motion.div>
           )}
