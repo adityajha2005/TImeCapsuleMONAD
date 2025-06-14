@@ -303,21 +303,21 @@ const CapsuleManager: React.FC = () => {
                 )}
               </div>
             )}
-            {isGiftSuccess && (
-              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 mb-4">
-                <p className="text-purple-400">✅ Capsule gifted successfully!</p>
-                {giftHash && (
-                  <a 
-                    href={`https://explorer.monad.xyz/tx/${giftHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-purple-300 hover:text-purple-200 text-sm"
-                  >
-                    View transaction →
-                  </a>
-                )}
-              </div>
-            )}
+                         {isGiftSuccess && (
+               <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 mb-4">
+                 <p className="text-purple-400">✅ Capsule gifted successfully!</p>
+                 {giftHash && (
+                   <a 
+                     href={`https://testnet.monadexplorer.com/tx/${giftHash}`}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     className="text-purple-300 hover:text-purple-200 text-sm"
+                   >
+                     View transaction →
+                   </a>
+                 )}
+               </div>
+             )}
           </div>
         )}
 

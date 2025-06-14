@@ -178,7 +178,7 @@ The contract has been verified and tested:
 4. **Data Not Loading**: Check network connection and RPC status
 
 ### Debug Tools
-- **Monad Explorer**: View transactions and contract state
+- **Monad Explorer**: View transactions and contract state at https://testnet.monadexplorer.com
 - **Browser Console**: Check for JavaScript errors
 - **Network Tab**: Monitor API calls and responses
 - **Wagmi DevTools**: Debug hook states and data

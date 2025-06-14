@@ -1,27 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { Clock, Lock, Unlock, Gift, Zap, Users, Calendar, Sparkles, Timer, Globe } from 'lucide-react';
+import { Clock, Lock, Unlock, Gift, Zap, Users, Calendar, Sparkles, Timer, Globe, Eye, ExternalLink } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import {
+  useGetOwnedCapsules,
+  useGetCapsule,
+  useUnlockCapsule,
+  useTransactionReceipt,
+  formatCapsuleData,
+  isUnlockable,
+  getTimeUntilUnlock,
+  type Capsule,
+} from '@/hooks/useTimeCapsule';
 
-interface Capsule {
-  id: number;
+interface GiftedCapsuleDisplay {
+  id: bigint;
   title: string;
   isUnlocked: boolean;
   type: 'memory' | 'prediction' | 'secret' | 'art' | 'message';
   creator: string;
+  recipient: string;
   unlockCondition: string;
-  unlockDate?: string;
+  unlockDate: string;
   blockNumber?: number;
   currentBlock?: number;
   communityVotes?: number;
   requiredVotes?: number;
   rarity: 'common' | 'rare' | 'legendary';
-  rewards?: string[];
+  rewards: string[];
   previewImage?: string;
   isGifted: boolean;
-  giftedBy?: string;
+  giftedBy: string;
+  encryptedURI: string;
+  unlockTime: bigint;
+  lockType: number;
+  visibility: number;
+  timeRemaining: number;
 }
 
 const capsuleTypeIcons = {
@@ -45,108 +63,163 @@ const rarityGlows = {
 };
 
 export default function GiftedCapsules() {
+  const { address, isConnected } = useAccount();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'locked' | 'unlocked'>('all');
-  const [hoveredCapsule, setHoveredCapsule] = useState<number | null>(null);
+  const [hoveredCapsule, setHoveredCapsule] = useState<bigint | null>(null);
 
-  const capsules: Capsule[] = [
-    {
-      id: 1,
-      title: 'Childhood Dreams',
-      type: 'memory',
-      isUnlocked: false,
-      creator: '0x1234...5678',
-      unlockCondition: 'Time-based',
-      unlockDate: '2025-12-25',
-      rarity: 'rare',
-      rewards: ['Special NFT Badge', '100 CAPS tokens'],
-      isGifted: true,
-      giftedBy: 'Alice.eth'
-    },
-    {
-      id: 2,
-      title: 'AI Prediction 2030',
-      type: 'prediction',
-      isUnlocked: true,
-      creator: '0x9876...5432',
-      unlockCondition: 'Event-based',
-      rarity: 'legendary',
-      rewards: ['Prediction Oracle Status', '500 CAPS tokens', 'Exclusive Art'],
-      isGifted: true,
-      giftedBy: 'Bob.eth'
-    },
-    {
-      id: 3,
-      title: 'Love Letter',
-      type: 'secret',
-      isUnlocked: false,
-      creator: '0x1111...2222',
-      unlockCondition: 'Community Vote',
-      communityVotes: 247,
-      requiredVotes: 500,
-      rarity: 'common',
-      rewards: ['Heart NFT', '50 CAPS tokens'],
-      isGifted: true,
-      giftedBy: 'Charlie.eth'
-    },
-    {
-      id: 4,
-      title: 'Digital Masterpiece',
-      type: 'art',
-      isUnlocked: false,
-      creator: '0x3333...4444',
-      unlockCondition: 'Block-based',
-      blockNumber: 18500000,
-      currentBlock: 18456789,
-      rarity: 'legendary',
-      rewards: ['Exclusive Art Collection', '1000 CAPS tokens'],
-      isGifted: true,
-      giftedBy: 'Diana.eth'
-    },
-    {
-      id: 5,
-      title: 'Future Message',
-      type: 'message',
-      isUnlocked: false,
-      creator: '0x5555...6666',
-      unlockCondition: 'Time-based',
-      unlockDate: '2026-01-01',
-      rarity: 'rare',
-      rewards: ['Time Traveler Badge', '200 CAPS tokens'],
-      isGifted: true,
-      giftedBy: 'Eve.eth'
-    }
-  ];
+  // Contract hooks
+  const { data: ownedCapsuleIds, isLoading: isLoadingCapsules } = useGetOwnedCapsules(address || '');
+  const { unlockCapsule, hash: unlockHash, isPending: isUnlocking } = useUnlockCapsule();
+  const { isLoading: isUnlockLoading, isSuccess: isUnlockSuccess } = useTransactionReceipt(unlockHash);
 
-  const filteredCapsules = capsules.filter(capsule => {
+  // Get capsule data for owned capsules - limit to first 10 for performance
+  const capsuleIds = Array.isArray(ownedCapsuleIds) ? ownedCapsuleIds.slice(0, 10) : [];
+  
+  // Call hooks for each capsule at the top level (fixed number of hooks)
+  const capsule0 = useGetCapsule(capsuleIds[0] || BigInt(0));
+  const capsule1 = useGetCapsule(capsuleIds[1] || BigInt(0));
+  const capsule2 = useGetCapsule(capsuleIds[2] || BigInt(0));
+  const capsule3 = useGetCapsule(capsuleIds[3] || BigInt(0));
+  const capsule4 = useGetCapsule(capsuleIds[4] || BigInt(0));
+  const capsule5 = useGetCapsule(capsuleIds[5] || BigInt(0));
+  const capsule6 = useGetCapsule(capsuleIds[6] || BigInt(0));
+  const capsule7 = useGetCapsule(capsuleIds[7] || BigInt(0));
+  const capsule8 = useGetCapsule(capsuleIds[8] || BigInt(0));
+  const capsule9 = useGetCapsule(capsuleIds[9] || BigInt(0));
+
+  // Collect all capsule data
+  const allCapsuleData = [
+    { id: capsuleIds[0], data: capsule0.data },
+    { id: capsuleIds[1], data: capsule1.data },
+    { id: capsuleIds[2], data: capsule2.data },
+    { id: capsuleIds[3], data: capsule3.data },
+    { id: capsuleIds[4], data: capsule4.data },
+    { id: capsuleIds[5], data: capsule5.data },
+    { id: capsuleIds[6], data: capsule6.data },
+    { id: capsuleIds[7], data: capsule7.data },
+    { id: capsuleIds[8], data: capsule8.data },
+    { id: capsuleIds[9], data: capsule9.data },
+  ].filter(item => item.id && item.data);
+
+  // Process capsule data
+  const giftedCapsules: GiftedCapsuleDisplay[] = useMemo(() => {
+    const processedCapsules = allCapsuleData
+      .map(({ id, data }) => {
+        const formatted = formatCapsuleData(data);
+        if (!formatted) return null;
+
+        // Check if this capsule was gifted (recipient is different from creator)
+        const isGifted = formatted.creator.toLowerCase() !== formatted.recipient.toLowerCase();
+        if (!isGifted) return null;
+
+        const timeRemaining = getTimeUntilUnlock(formatted);
+        
+        // Determine type based on lock type and other factors
+        const getType = (): 'memory' | 'prediction' | 'secret' | 'art' | 'message' => {
+          if (formatted.encryptedURI.includes('prediction')) return 'prediction';
+          if (formatted.encryptedURI.includes('art')) return 'art';
+          if (formatted.encryptedURI.includes('secret')) return 'secret';
+          if (formatted.encryptedURI.includes('memory')) return 'memory';
+          return 'message';
+        };
+
+        // Determine rarity based on unlock time and visibility
+        const getRarity = (): 'common' | 'rare' | 'legendary' => {
+          const unlockTimeInDays = Number(formatted.unlockTime - BigInt(Math.floor(Date.now() / 1000))) / 86400;
+          if (unlockTimeInDays > 365) return 'legendary';
+          if (unlockTimeInDays > 30) return 'rare';
+          return 'common';
+        };
+
+        // Extract title from encrypted URI (simplified)
+        const getTitle = (): string => {
+          try {
+            if (formatted.encryptedURI.startsWith('data:application/json;base64,')) {
+              const decoded = atob(formatted.encryptedURI.split(',')[1]);
+              const parsed = JSON.parse(decoded);
+              return parsed.title || `Capsule #${formatted.id.toString()}`;
+            }
+          } catch (e) {
+            // Fallback if decoding fails
+          }
+          return `Capsule #${formatted.id.toString()}`;
+        };
+
+        return {
+          id: formatted.id,
+          title: getTitle(),
+          isUnlocked: formatted.isOpened,
+          type: getType(),
+          creator: formatted.creator,
+          recipient: formatted.recipient,
+          unlockCondition: formatted.lockType === 0 ? 'Time-based' : 'Block-based',
+          unlockDate: new Date(Number(formatted.unlockTime) * 1000).toISOString().split('T')[0],
+          rarity: getRarity(),
+          rewards: ['Capsule NFT', 'CAPS Tokens'],
+          isGifted: true,
+          giftedBy: formatted.creator,
+          encryptedURI: formatted.encryptedURI,
+          unlockTime: formatted.unlockTime,
+          lockType: formatted.lockType,
+          visibility: formatted.visibility,
+          timeRemaining
+        } as GiftedCapsuleDisplay;
+      });
+    
+    return processedCapsules.filter((capsule): capsule is GiftedCapsuleDisplay => capsule !== null);
+  }, [allCapsuleData]);
+
+  const filteredCapsules = giftedCapsules.filter(capsule => {
     if (selectedFilter === 'locked') return !capsule.isUnlocked;
     if (selectedFilter === 'unlocked') return capsule.isUnlocked;
     return true;
   });
 
-  const getProgressPercentage = (capsule: Capsule) => {
-    if (capsule.unlockCondition === 'Community Vote' && capsule.communityVotes && capsule.requiredVotes) {
-      return (capsule.communityVotes / capsule.requiredVotes) * 100;
-    }
-    if (capsule.unlockCondition === 'Block-based' && capsule.blockNumber && capsule.currentBlock) {
-      return Math.min((capsule.currentBlock / capsule.blockNumber) * 100, 100);
-    }
+  const getProgressPercentage = (capsule: GiftedCapsuleDisplay) => {
     if (capsule.unlockCondition === 'Time-based' && capsule.unlockDate) {
       const now = new Date();
       const unlock = new Date(capsule.unlockDate);
-      const total = unlock.getTime() - new Date('2025-01-01').getTime();
-      const elapsed = now.getTime() - new Date('2025-01-01').getTime();
-      return Math.min((elapsed / total) * 100, 100);
+      const start = new Date(Date.now() - (365 * 24 * 60 * 60 * 1000)); // Assume 1 year ago as start
+      const total = unlock.getTime() - start.getTime();
+      const elapsed = now.getTime() - start.getTime();
+      return Math.min(Math.max((elapsed / total) * 100, 0), 100);
     }
     return 0;
   };
 
-  const formatTimeRemaining = (date: string) => {
-    const now = new Date();
-    const unlock = new Date(date);
-    const diff = unlock.getTime() - now.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    return days > 0 ? `${days} days` : 'Soon';
+  const formatTimeRemaining = (timeRemaining: number) => {
+    if (timeRemaining <= 0) return 'Ready to unlock!';
+    
+    const days = Math.floor(timeRemaining / 86400);
+    const hours = Math.floor((timeRemaining % 86400) / 3600);
+    
+    if (days > 0) return `${days} days`;
+    if (hours > 0) return `${hours} hours`;
+    return 'Soon';
   };
+
+  const handleUnlock = (capsuleId: bigint) => {
+    unlockCapsule(capsuleId);
+  };
+
+  const formatAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  // Show wallet connection if not connected
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-black pt-12 text-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-500 bg-clip-text text-transparent mb-8">
+            Connect Your Wallet
+          </h1>
+          <p className="text-gray-400 mb-8">Connect your wallet to view your gifted time capsules</p>
+          <ConnectButton />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -154,29 +227,30 @@ export default function GiftedCapsules() {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 50 }}
       transition={{ duration: 0.5 }}
-      className="container mx-auto px-4 py-16 min-h-screen mt-12 "
+      className="container mx-auto px-4 py-16 min-h-screen mt-12"
     >
-        <div className="absolute inset-0">
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/20 via-black to-cyan-900/20" />
-              <motion.div
-                className="absolute top-32 right-20 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl"
-                animate={{
-                  scale: [1, 1.3, 1],
-                  opacity: [0.3, 0.6, 0.3]
-                }}
-                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-              />
-              <motion.div
-                className="absolute bottom-20 left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"
-                animate={{
-                  scale: [1, 0.7, 1],
-                  opacity: [0.2, 0.5, 0.2]
-                }}
-                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-              />
-            </div>
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/20 via-black to-cyan-900/20" />
+        <motion.div
+          className="absolute top-32 right-20 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.3, 0.6, 0.3]
+          }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute bottom-20 left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 0.7, 1],
+            opacity: [0.2, 0.5, 0.2]
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </div>
+
       {/* Header */}
-      <div className="text-center mb-12">
+      <div className="text-center mb-12 relative z-10">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -184,7 +258,7 @@ export default function GiftedCapsules() {
           className="inline-flex items-center gap-3 relative mb-4"
         >
           <Gift className="w-8 h-8 text-cyan-300" />
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-400 to-cyan-600 bg-clip-text text-transparent ">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-cyan-400 to-cyan-600 bg-clip-text text-transparent">
             Gifted Capsules
           </h1>
           <Gift className="w-8 h-8 text-cyan-300" />
@@ -194,151 +268,193 @@ export default function GiftedCapsules() {
         </p>
       </div>
 
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 text-center">
+          <h3 className="text-lg font-semibold text-cyan-400 mb-2">Total Gifted</h3>
+          <p className="text-3xl font-bold text-white">{giftedCapsules.length}</p>
+        </div>
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 text-center">
+          <h3 className="text-lg font-semibold text-green-400 mb-2">Unlocked</h3>
+          <p className="text-3xl font-bold text-white">
+            {giftedCapsules.filter(c => c.isUnlocked).length}
+          </p>
+        </div>
+        <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6 text-center">
+          <h3 className="text-lg font-semibold text-red-400 mb-2">Locked</h3>
+          <p className="text-3xl font-bold text-white">
+            {giftedCapsules.filter(c => !c.isUnlocked).length}
+          </p>
+        </div>
+      </div>
+
+      {/* Transaction Status */}
+      {isUnlockSuccess && (
+        <div className="mb-6 relative z-10">
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+            <p className="text-green-400">✅ Capsule unlocked successfully!</p>
+            {unlockHash && (
+              <a 
+                href={`https://testnet.monadexplorer.com/tx/${unlockHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-300 hover:text-green-200 text-sm inline-flex items-center gap-1"
+              >
+                View transaction <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Filter Tabs */}
-      <div className="flex justify-center mb-8">
+      <div className="flex justify-center mb-8 relative z-10">
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-full p-1 border border-slate-700">
           {['all', 'locked', 'unlocked'].map((filter) => (
-            <button
+            <motion.button
               key={filter}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onClick={() => setSelectedFilter(filter as any)}
-              className={`px-6 py-2 rounded-full capitalize transition-all duration-300 ${
+              className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                 selectedFilter === filter
                   ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/25'
                   : 'text-slate-400 hover:text-white'
               }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              {filter}
-            </button>
+              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              <span className="ml-2 text-xs opacity-75">
+                ({filter === 'all' ? giftedCapsules.length : 
+                  filter === 'locked' ? giftedCapsules.filter(c => !c.isUnlocked).length :
+                  giftedCapsules.filter(c => c.isUnlocked).length})
+              </span>
+            </motion.button>
           ))}
         </div>
       </div>
 
+      {/* Loading State */}
+      {isLoadingCapsules && (
+        <div className="text-center py-12 relative z-10">
+          <div className="w-12 h-12 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full mx-auto mb-4 animate-spin" />
+          <p className="text-gray-400">Loading your gifted capsules...</p>
+        </div>
+      )}
+
       {/* Capsules Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <AnimatePresence mode="popLayout">
-          {filteredCapsules.map((capsule, index) => {
-            const IconComponent = capsuleTypeIcons[capsule.type];
-            const progress = getProgressPercentage(capsule);
-            
-            return (
-              <motion.div
-                key={capsule.id}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ 
-                  scale: 1.02, 
-                  rotateY: 5,
-                  rotateX: 5,
-                }}
-                onHoverStart={() => setHoveredCapsule(capsule.id)}
-                onHoverEnd={() => setHoveredCapsule(null)}
-                className={`relative overflow-hidden rounded-2xl border-2 backdrop-blur-sm transition-all duration-500 ${
-                  rarityColors[capsule.rarity]
-                } ${rarityGlows[capsule.rarity]} shadow-2xl hover:shadow-3xl`}
-                style={{
-                  background: `linear-gradient(135deg, ${
-                    capsule.rarity === 'common' ? 'rgba(59, 130, 246, 0.1)' :
-                    capsule.rarity === 'rare' ? 'rgba(147, 51, 234, 0.1)' :
-                    'rgba(245, 158, 11, 0.1)'
-                  }, rgba(0, 0, 0, 0.3))`
-                }}
-              >
-                {/* Animated Background */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className={`absolute inset-0 bg-gradient-to-br ${
-                    capsule.rarity === 'common' ? 'from-cyan-500/20 to-cyan-500/20' :
-                    capsule.rarity === 'rare' ? 'from-cyan-500/20 to-pink-500/20' :
-                    'from-amber-500/20 to-orange-500/20'
+      {filteredCapsules.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10">
+          <AnimatePresence mode="popLayout">
+            {filteredCapsules.map((capsule, index) => {
+              const TypeIcon = capsuleTypeIcons[capsule.type];
+              const progress = getProgressPercentage(capsule);
+              const canUnlock = !capsule.isUnlocked && capsule.timeRemaining <= 0;
+
+              return (
+                <motion.div
+                  key={capsule.id.toString()}
+                  layout
+                  initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -50, scale: 0.9 }}
+                  transition={{ delay: index * 0.1, type: "spring", stiffness: 100 }}
+                  onHoverStart={() => setHoveredCapsule(capsule.id)}
+                  onHoverEnd={() => setHoveredCapsule(null)}
+                  className={`relative overflow-hidden rounded-2xl backdrop-blur-sm border transition-all duration-500 cursor-pointer group ${
+                    rarityColors[capsule.rarity]
+                  } ${
+                    hoveredCapsule === capsule.id ? `shadow-2xl ${rarityGlows[capsule.rarity]} scale-105` : 'shadow-lg'
+                  }`}
+                >
+                  {/* Rarity Glow Effect */}
+                  <div className={`absolute inset-0 opacity-20 bg-gradient-to-br ${
+                    capsule.rarity === 'legendary' ? 'from-amber-400 to-orange-500' :
+                    capsule.rarity === 'rare' ? 'from-cyan-400 to-pink-500' :
+                    'from-cyan-400 to-cyan-600'
                   }`} />
-                  {hoveredCapsule === capsule.id && (
-                    <motion.div
-                      initial={{ scale: 0, rotate: 0 }}
-                      animate={{ scale: 1.5, rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                    />
-                  )}
-                </div>
-
-                <div className="relative p-6">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
+                  
+                  <div className="relative p-6">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-3 rounded-xl ${
+                          capsule.isUnlocked ? 'bg-green-500/20 text-green-400' : 'bg-slate-700/50 text-slate-400'
+                        }`}>
+                          <TypeIcon className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-lg text-white group-hover:text-cyan-300 transition-colors">
+                            {capsule.title}
+                          </h3>
+                          <p className="text-sm text-slate-400">#{capsule.id.toString()}</p>
+                        </div>
+                      </div>
+                      
+                      {/* Status Icon */}
                       <div className={`p-2 rounded-lg ${
-                        capsule.isUnlocked ? 'bg-green-500/20 text-green-400' : 'bg-slate-700/50 text-slate-400'
+                        capsule.isUnlocked ? 'bg-green-500/20' : 'bg-red-500/20'
                       }`}>
-                        <IconComponent className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">{capsule.title}</h3>
-                        <p className="text-sm text-slate-400 capitalize">{capsule.type} Capsule</p>
+                        {capsule.isUnlocked ? (
+                          <Unlock className="w-5 h-5 text-green-400" />
+                        ) : (
+                          <Lock className="w-5 h-5 text-red-400" />
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {capsule.isUnlocked ? (
-                        <Unlock className="w-5 h-5 text-green-400" />
-                      ) : (
-                        <Lock className="w-5 h-5 text-slate-400" />
+
+                    {/* Gift Info */}
+                    <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Gift className="w-4 h-4 text-purple-400" />
+                        <span className="text-sm text-purple-300">Gifted by</span>
+                      </div>
+                      <p className="text-white font-mono text-sm">{formatAddress(capsule.giftedBy || '')}</p>
+                    </div>
+
+                    {/* Details */}
+                    <div className="space-y-3 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-sm">Type</span>
+                        <span className="text-white capitalize">{capsule.type}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-sm">Rarity</span>
+                        <span className={`capitalize font-medium ${
+                          capsule.rarity === 'legendary' ? 'text-amber-400' :
+                          capsule.rarity === 'rare' ? 'text-pink-400' :
+                          'text-cyan-400'
+                        }`}>
+                          {capsule.rarity}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-sm">Status</span>
+                        <span className={`font-medium ${
+                          capsule.isUnlocked ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {capsule.isUnlocked ? 'Unlocked' : 'Locked'}
+                        </span>
+                      </div>
+                      {!capsule.isUnlocked && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 text-sm">Time Remaining</span>
+                          <span className="text-cyan-400 font-medium">
+                            {formatTimeRemaining(capsule.timeRemaining)}
+                          </span>
+                        </div>
                       )}
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        capsule.rarity === 'common' ? 'bg-cyan-500/20 text-cyan-400' :
-                        capsule.rarity === 'rare' ? 'bg-cyan-500/20 text-cyan-400' :
-                        'bg-amber-500/20 text-amber-400'
-                      }`}>
-                        {capsule.rarity}
-                      </span>
                     </div>
-                  </div>
 
-                  {/* Gift Info */}
-                  <div className="mb-4 p-3 bg-gradient-to-r from-pink-500/10 to-cyan-500/10 rounded-lg border border-pink-500/20">
-                    <div className="flex items-center gap-2 text-pink-400">
-                      <Gift className="w-4 h-4" />
-                      <span className="text-sm">Gifted by {capsule.giftedBy}</span>
-                    </div>
-                  </div>
-
-                  {/* Unlock Condition */}
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      {capsule.unlockCondition === 'Time-based' && <Calendar className="w-4 h-4 text-cyan-400" />}
-                      {capsule.unlockCondition === 'Community Vote' && <Users className="w-4 h-4 text-cyan-400" />}
-                      {capsule.unlockCondition === 'Block-based' && <Globe className="w-4 h-4 text-green-400" />}
-                      {capsule.unlockCondition === 'Event-based' && <Zap className="w-4 h-4 text-yellow-400" />}
-                      <span className="text-sm text-slate-300">{capsule.unlockCondition}</span>
-                    </div>
-                    
-                    {!capsule.isUnlocked && (
-                      <div className="space-y-2">
-                        {capsule.unlockDate && (
-                          <div className="flex items-center gap-2 text-xs text-slate-400">
-                            <Timer className="w-3 h-3" />
-                            <span>Unlocks in {formatTimeRemaining(capsule.unlockDate)}</span>
-                          </div>
-                        )}
-                        {capsule.communityVotes && capsule.requiredVotes && (
-                          <div className="text-xs text-slate-400">
-                            Votes: {capsule.communityVotes}/{capsule.requiredVotes}
-                          </div>
-                        )}
-                        {capsule.blockNumber && capsule.currentBlock && (
-                          <div className="text-xs text-slate-400">
-                            Block: {capsule.currentBlock.toLocaleString()}/{capsule.blockNumber.toLocaleString()}
-                          </div>
-                        )}
-                        
-                        {/* Progress Bar */}
-                        <div className="w-full bg-slate-700 rounded-full h-2">
+                    {/* Progress Bar */}
+                    {!capsule.isUnlocked && capsule.unlockCondition === 'Time-based' && (
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-slate-400 text-sm">Progress</span>
+                          <span className="text-slate-300 text-sm">{Math.round(progress)}%</span>
+                        </div>
+                        <div className="w-full bg-slate-700/50 rounded-full h-2">
                           <motion.div
-                            className={`h-2 rounded-full ${
-                              capsule.rarity === 'common' ? 'bg-cyan-500' :
-                              capsule.rarity === 'rare' ? 'bg-cyan-500' :
-                              'bg-amber-500'
-                            }`}
+                            className="bg-gradient-to-r from-cyan-500 to-cyan-400 h-2 rounded-full"
                             initial={{ width: 0 }}
                             animate={{ width: `${progress}%` }}
                             transition={{ duration: 1, delay: index * 0.1 }}
@@ -346,86 +462,82 @@ export default function GiftedCapsules() {
                         </div>
                       </div>
                     )}
-                  </div>
 
-                  {/* Rewards Preview */}
-                  {capsule.rewards && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium text-slate-300 mb-2">Rewards:</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {capsule.rewards.slice(0, 2).map((reward, idx) => (
-                          <span
-                            key={idx}
-                            className="text-xs px-2 py-1 bg-slate-700/50 text-slate-300 rounded-full"
-                          >
-                            {reward}
-                          </span>
-                        ))}
-                        {capsule.rewards.length > 2 && (
-                          <span className="text-xs px-2 py-1 bg-slate-700/50 text-slate-300 rounded-full">
-                            +{capsule.rewards.length - 2} more
-                          </span>
-                        )}
-                      </div>
+                    {/* Actions */}
+                    <div className="flex gap-3">
+                      {capsule.isUnlocked ? (
+                        <button className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                          <Eye className="w-4 h-4" />
+                          View Content
+                        </button>
+                      ) : canUnlock ? (
+                        <button
+                          onClick={() => handleUnlock(capsule.id)}
+                          disabled={isUnlocking || isUnlockLoading}
+                          className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Unlock className="w-4 h-4" />
+                          {isUnlocking || isUnlockLoading ? 'Unlocking...' : 'Unlock Now'}
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="flex-1 bg-gray-600 opacity-50 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2"
+                        >
+                          <Timer className="w-4 h-4" />
+                          Locked
+                        </button>
+                      )}
                     </div>
-                  )}
 
-                  {/* Action Button */}
-                  <Link
-                    href={`/capsule/${capsule.id}`}
-                    className={`w-full block text-center py-3 px-4 rounded-lg font-medium transition-all duration-300 ${
-                      capsule.isUnlocked
-                        ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/25'
-                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600'
-                    }`}
-                  >
-                    {capsule.isUnlocked ? 'Open Capsule' : 'View Details'}
-                  </Link>
-                </div>
-
-                {/* Floating particles for unlocked capsules */}
-                {capsule.isUnlocked && (
-                  <div className="absolute inset-0 pointer-events-none">
-                    {[...Array(3)].map((_, i) => (
-                      <motion.div
-                        key={i}
-                        className="absolute w-1 h-1 bg-green-400 rounded-full"
-                        initial={{ 
-                          x: Math.random() * 300, 
-                          y: Math.random() * 200,
-                          opacity: 0 
-                        }}
-                        animate={{ 
-                          y: [null, -20, -40],
-                          opacity: [0, 1, 0]
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          delay: i * 0.5,
-                          ease: "easeOut"
-                        }}
-                      />
-                    ))}
+                    {/* Unlock Date */}
+                    {!capsule.isUnlocked && capsule.unlockDate && (
+                      <div className="mt-3 text-center">
+                        <div className="flex items-center justify-center gap-2 text-slate-400 text-sm">
+                          <Calendar className="w-4 h-4" />
+                          <span>Unlocks on {new Date(capsule.unlockDate).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
 
-      {filteredCapsules.length === 0 && (
+                  {/* Rarity Badge */}
+                  <div className="absolute top-4 right-4">
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      capsule.rarity === 'legendary' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                      capsule.rarity === 'rare' ? 'bg-pink-500/20 text-pink-400 border border-pink-500/30' :
+                      'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                    }`}>
+                      {capsule.rarity.toUpperCase()}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      ) : !isLoadingCapsules ? (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="text-center text-slate-400 mt-16"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center py-16 relative z-10"
         >
-          <div className="text-6xl mb-4">🎁</div>
-          <h3 className="text-xl font-medium mb-2">No capsules found</h3>
-          <p>Try adjusting your filter or check back later for new gifts!</p>
+          <div className="w-24 h-24 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Gift className="w-12 h-12 text-gray-400" />
+          </div>
+          <h3 className="text-2xl font-semibold text-gray-300 mb-2">No Gifted Capsules Found</h3>
+          <p className="text-gray-400 mb-8">
+            You haven't received any gifted capsules yet. Ask friends to gift you some time capsules!
+          </p>
+          <Link
+            href="/create"
+            className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-lg transition-colors"
+          >
+            <Sparkles className="w-5 h-5" />
+            Create Your First Capsule
+          </Link>
         </motion.div>
-      )}
+      ) : null}
     </motion.div>
   );
 }
