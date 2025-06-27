@@ -121,7 +121,14 @@ const Hero = () => {
     <div className="relative min-h-screen  flex flex-col items-center justify-center overflow-hidden pt-20">
       {/* Three.js Background */}
       
+     <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 1.5 }}
+      className="absolute inset-0"
+    >
       <Scene />
+    </motion.div>
       
       
      {[
