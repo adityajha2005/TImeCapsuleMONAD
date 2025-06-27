@@ -124,7 +124,7 @@ const Hero = () => {
      <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 1.5 }}
+      transition={{ duration: 3 }}
       className="absolute inset-0"
     >
       <Scene />
